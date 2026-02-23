@@ -65,6 +65,8 @@ const AppState = {
     // Auth
     accessToken: null,
     isSignedIn: false,
+    currentUser: null,   // Firebase Auth user object
+    isEditor: false,     // true if user email is in CONFIG.ALLOWED_EDITORS
 
     // Drive 파일 ID 캐시
     rosterFileId: null,

@@ -491,6 +491,7 @@ function initTab1Events() {
 
 // ── 저장 로직 ──────────────────────────────────────────────────────────────
 async function handleSave(isDraft, overwrite = false) {
+    if (!checkEditorAccess()) return;
     if (AppState.attendees.length === 0) {
         showToast('참석자를 선택해주세요.', 'error');
         return;
@@ -589,6 +590,7 @@ function hideDuplicateWarning() {
 
 // ── 기록에서 불러오기 (Tab3 → Tab1) ────────────────────────────────────────
 function loadMatchToEditor(matchData) {
+    if (!checkEditorAccess()) return;
     // 게스트 명단 통합
     matchData.attendees.forEach(name => {
         if (!AppState.roster[name]) AppState.roster[name] = 'Guest';

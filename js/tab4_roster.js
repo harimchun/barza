@@ -3,26 +3,26 @@
 // =============================================
 
 function renderRosterTab() {
-    const container = document.getElementById('tab4-content');
-    if (!container) return;
+  const container = document.getElementById('tab4-content');
+  if (!container) return;
 
-    const roster = AppState.roster;
-    const members = Object.entries(roster).filter(([, r]) => r === 'Member').sort((a, b) => a[0].localeCompare(b[0], 'ko'));
-    const guests = Object.entries(roster).filter(([, r]) => r === 'Guest').sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  const roster = AppState.roster;
+  const members = Object.entries(roster).filter(([, r]) => r === 'Member').sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+  const guests = Object.entries(roster).filter(([, r]) => r === 'Guest').sort((a, b) => a[0].localeCompare(b[0], 'ko'));
 
-    const buildRows = (entries, isGuest) => entries.map(([name, role]) => `
+  const buildRows = (entries, isGuest) => entries.map(([name, role]) => `
     <tr>
       <td class="roster-name">${name}</td>
       <td><span class="role-badge ${isGuest ? 'guest' : 'member'}">${isGuest ? '용병' : '멤버'}</span></td>
       <td class="roster-actions">
         ${isGuest
-            ? `<button class="btn-sm btn-promote" onclick="promotePlayer('${name}')">멤버로 승격</button>`
-            : `<button class="btn-sm btn-demote" onclick="demotePlayer('${name}')">용병으로 변경</button>`}
+      ? `<button class="btn-sm btn-promote" onclick="promotePlayer('${name}')">멤버로 승격</button>`
+      : `<button class="btn-sm btn-demote" onclick="demotePlayer('${name}')">용병으로 변경</button>`}
         <button class="btn-sm btn-delete-player" onclick="deletePlayer('${name}')">🗑️</button>
       </td>
     </tr>`).join('');
 
-    container.innerHTML = `
+  container.innerHTML = `
     <div class="roster-add-card">
       <h3>➕ 선수 / 용병 등록</h3>
       <div class="roster-add-form">
@@ -52,53 +52,57 @@ function renderRosterTab() {
       </div>
     </div>`;
 
-    // Enter key for new player
-    document.getElementById('new-player-name').addEventListener('keydown', e => {
-        if (e.key === 'Enter') addPlayer();
-    });
+  // Enter key for new player
+  document.getElementById('new-player-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addPlayer();
+  });
 }
 
 async function addPlayer() {
-    const nameInp = document.getElementById('new-player-name');
-    const roleSel = document.getElementById('new-player-role');
-    const name = nameInp.value.trim();
-    if (!name) return;
-    if (AppState.roster[name]) {
-        showToast(`"${name}"은(는) 이미 등록되어 있습니다.`, 'error');
-        return;
-    }
-    AppState.roster[name] = roleSel.value;
-    nameInp.value = '';
-    await persistRosterChange();
-    showToast(`${name} 등록 완료! (${roleSel.value === 'Guest' ? '용병' : '멤버'})`);
+  if (!checkEditorAccess()) return;
+  const nameInp = document.getElementById('new-player-name');
+  const roleSel = document.getElementById('new-player-role');
+  const name = nameInp.value.trim();
+  if (!name) return;
+  if (AppState.roster[name]) {
+    showToast(`"${name}"은(는) 이미 등록되어 있습니다.`, 'error');
+    return;
+  }
+  AppState.roster[name] = roleSel.value;
+  nameInp.value = '';
+  await persistRosterChange();
+  showToast(`${name} 등록 완료! (${roleSel.value === 'Guest' ? '용병' : '멤버'})`);
 }
 
 async function promotePlayer(name) {
-    AppState.roster[name] = 'Member';
-    await persistRosterChange();
-    showToast(`${name}님을 정식 멤버로 승격했습니다! 🎉`);
+  if (!checkEditorAccess()) return;
+  AppState.roster[name] = 'Member';
+  await persistRosterChange();
+  showToast(`${name}님을 정식 멤버로 승격했습니다! 🎉`);
 }
 
 async function demotePlayer(name) {
-    AppState.roster[name] = 'Guest';
-    await persistRosterChange();
-    showToast(`${name}님을 용병으로 변경했습니다.`);
+  if (!checkEditorAccess()) return;
+  AppState.roster[name] = 'Guest';
+  await persistRosterChange();
+  showToast(`${name}님을 용병으로 변경했습니다.`);
 }
 
 async function deletePlayer(name) {
-    if (!confirm(`"${name}"을(를) 선수단에서 삭제하시겠습니까?`)) return;
-    delete AppState.roster[name];
-    await persistRosterChange();
-    showToast(`${name} 삭제 완료.`);
+  if (!checkEditorAccess()) return;
+  if (!confirm(`"${name}"을(를) 선수단에서 삭제하시겠습니까?`)) return;
+  delete AppState.roster[name];
+  await persistRosterChange();
+  showToast(`${name} 삭제 완료.`);
 }
 
 async function persistRosterChange() {
-    try {
-        await saveRoster();
-    } catch (e) {
-        showToast('명단 저장 실패: ' + e.message, 'error');
-    }
-    renderRosterTab();
-    // 참석자 체크리스트도 업데이트
-    renderPlayerChecklist();
+  try {
+    await saveRoster();
+  } catch (e) {
+    showToast('명단 저장 실패: ' + e.message, 'error');
+  }
+  renderRosterTab();
+  // 참석자 체크리스트도 업데이트
+  renderPlayerChecklist();
 }

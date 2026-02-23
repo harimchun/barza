@@ -15,6 +15,10 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
   <link rel="stylesheet" href="css/style.css">
 
+  <!-- Firebase SDK (Google 로그인용) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
 </head>
 
 <body>
@@ -180,9 +184,9 @@
       <div class="card">
         <div class="card-title">5. 저장</div>
         <div class="save-buttons-row">
-          <button id="new-match-btn">🔄 새 경기</button>
-          <button id="draft-save-btn">💾 임시 저장 (Draft)</button>
-          <button id="final-save-btn" class="btn-primary">✅ 확정 저장 (통계 반영)</button>
+          <button id="new-match-btn" class="editor-only">🔄 새 경기</button>
+          <button id="draft-save-btn" class="editor-only">💾 임시 저장 (Draft)</button>
+          <button id="final-save-btn" class="btn-primary editor-only">✅ 확정 저장 (통계 반영)</button>
         </div>
         <div id="duplicate-warning" style="display:none"></div>
       </div>

@@ -1,10 +1,24 @@
 // =============================================
 // FC 바르자 팀 매니저 - 설정 파일
-// Firebase Realtime Database 설정 (1회만 입력)
 // =============================================
 const CONFIG = {
-  // Firebase 콘솔(https://console.firebase.google.com)에서 프로젝트 생성 후
-  // Realtime Database URL을 아래에 붙여넣으세요.
-  // 예: 'https://fc-barja-xxxxx-default-rtdb.firebaseio.com'
+  // Firebase Realtime Database URL
   FIREBASE_DB_URL: 'https://fc-barja-default-rtdb.asia-southeast1.firebasedatabase.app/',
+
+  // Firebase 프로젝트 설정 (Google 로그인용)
+  FIREBASE_CONFIG: {
+    apiKey: "AIzaSyAhYi96-WeWO12h0O9WqBzrP6_kZl8ss8s",
+    authDomain: "fc-barja.firebaseapp.com",
+    databaseURL: "https://fc-barja-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "fc-barja",
+    storageBucket: "fc-barja.firebasestorage.app",
+    messagingSenderId: "1059135679350",
+    appId: "1:1059135679350:web:6e769f19ca482edb9b2857",
+  },
+
+  // ✏️ 경기 기록 저장/수정/삭제 권한이 있는 이메일 목록
+  // 본인 구글 이메일을 추가하세요.
+  ALLOWED_EDITORS: [
+    'bgr1663@gmail.com',
+  ],
 };
