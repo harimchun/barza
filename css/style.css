@@ -1,0 +1,1367 @@
+/* =============================================
+   FC 바르자 팀 매니저 - 스타일시트
+   ============================================= */
+
+/* --- CSS 변수 (토큰) --- */
+:root {
+  --bg: #0a0a0a;
+  --surface: #161616;
+  --surface-2: #222222;
+  --border: rgba(255, 255, 255, 0.1);
+  --burgundy: #8C1C2B;
+  --burgundy-light: #c0344a;
+  --burgundy-dim: rgba(140, 28, 43, 0.18);
+  --red: #e63946;
+  --blue: #3b82f6;
+  --text: #f0ecec;
+  --text-muted: #a09090;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+  --transition: 0.18s ease;
+  /* keep these for canvas / pitch */
+  --green-dark: #1a4731;
+  --green: #2d6a4f;
+  --green-light: #52b788;
+  --gold: var(--burgundy);
+  --gold-dim: var(--burgundy-dim);
+}
+
+/* --- 리셋 & 기본 --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+}
+
+body {
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* --- 헤더 --- */
+.app-header {
+  background: linear-gradient(135deg, #080808 0%, #2a0a10 60%, #080808 100%);
+  border-bottom: 1px solid rgba(140, 28, 43, 0.3);
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.header-logo .badge {
+  font-size: 1.5rem;
+}
+
+.header-logo .name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+#auth-status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+#auth-status.success {
+  color: var(--green-light);
+}
+
+#auth-status.warn {
+  color: var(--gold);
+}
+
+/* Auth 버튼 */
+.auth-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.auth-btn:hover {
+  border-color: var(--burgundy-light);
+  color: var(--burgundy-light);
+}
+
+.auth-btn.auth-connected {
+  border-color: var(--green-light);
+  color: var(--green-light);
+}
+
+.auth-btn.auth-warn {
+  border-color: var(--burgundy);
+  color: var(--burgundy);
+}
+
+/* --- 탭 네비게이션 --- */
+.tab-nav {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.75rem 1.5rem 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 0.5rem 1rem 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.tab-btn:hover {
+  color: var(--text);
+}
+
+.tab-btn.active {
+  color: var(--burgundy-light);
+  border-bottom-color: var(--burgundy);
+}
+
+/* --- 탭 패널 --- */
+.tab-panel {
+  display: none;
+  animation: fadeIn 0.2s ease;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- 메인 컨테이너 --- */
+.main-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem;
+}
+
+/* --- 카드 --- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.75rem;
+}
+
+/* --- 폼 공통 --- */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+  font-weight: 500;
+}
+
+input[type="text"],
+input[type="date"],
+input[type="number"],
+select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 0.42rem 0.65rem;
+  font-size: 0.88rem;
+  transition: var(--transition);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-dim);
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
+
+/* --- 버튼 --- */
+.btn-primary {
+  background: var(--burgundy);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-primary:hover {
+  background: var(--burgundy-light);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 1.1rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-secondary:hover {
+  border-color: var(--burgundy-light);
+  color: var(--burgundy-light);
+}
+
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-danger:hover {
+  background: #c1121f;
+}
+
+.btn-cancel {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-sm {
+  font-size: 0.78rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+
+.btn-promote {
+  background: var(--burgundy-dim);
+  color: var(--burgundy-light);
+  border-color: var(--burgundy);
+}
+
+.btn-promote:hover {
+  background: var(--burgundy);
+  color: #fff;
+}
+
+.btn-demote {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--blue);
+  border-color: var(--blue);
+}
+
+.btn-delete-player {
+  background: rgba(230, 57, 70, 0.1);
+  color: var(--red);
+  border-color: var(--red);
+}
+
+/* --- Toast --- */
+#toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toast {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.65rem 1.1rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.3s, transform 0.3s;
+  max-width: 320px;
+  box-shadow: var(--shadow);
+}
+
+.toast.show {
+  opacity: 1;
+  transform: none;
+}
+
+.toast.toast-success {
+  border-left: 3px solid var(--green-light);
+}
+
+.toast.toast-error {
+  border-left: 3px solid var(--red);
+}
+
+.toast.toast-info {
+  border-left: 3px solid var(--blue);
+}
+
+/* --- 수정 중 배너 --- */
+#edit-mode-notice {
+  display: none;
+  background: var(--burgundy-dim);
+  border: 1px solid var(--burgundy);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: var(--burgundy-light);
+  margin-bottom: 1rem;
+}
+
+/* ============================================
+   Tab 1 - 당일 경기 운영
+   ============================================ */
+
+/* 2컬럼 레이아웃 */
+.match-main-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .match-main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- 참석자 체크리스트 --- */
+.player-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.3rem;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+  background: var(--bg);
+}
+
+.player-check-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background var(--transition);
+}
+
+.player-check-item:hover {
+  background: var(--surface-2);
+}
+
+.player-check-item.is-guest {
+  color: var(--gold);
+}
+
+.player-check-item em {
+  font-size: 0.72rem;
+  color: var(--gold);
+  font-style: normal;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--burgundy);
+  cursor: pointer;
+}
+
+/* Guest 추가 */
+.guest-add-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.guest-add-row input {
+  flex: 1;
+}
+
+.guest-add-row button {
+  white-space: nowrap;
+}
+
+/* --- 스쿼드 테이블 --- */
+.squad-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  margin-top: 0.75rem;
+}
+
+.squad-table th,
+.squad-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.squad-table th {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--surface-2);
+}
+
+.squad-table .squad-name {
+  text-align: left;
+  font-weight: 500;
+}
+
+.squad-table .participation-score {
+  font-weight: 700;
+  color: var(--gold);
+}
+
+/* --- Playtime Stats --- */
+.playtime-info {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  color: var(--text-muted);
+}
+
+.playtime-info strong {
+  color: var(--text);
+}
+
+.playtime-alert {
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.playtime-alert.warning {
+  background: var(--burgundy-dim);
+  color: var(--burgundy-light);
+  border: 1px solid rgba(140, 28, 43, 0.3);
+}
+
+.playtime-alert.success {
+  background: rgba(82, 183, 136, 0.1);
+  color: var(--green-light);
+  border: 1px solid rgba(82, 183, 136, 0.25);
+}
+
+/* --- 포메이션 빌더 --- */
+#quarter-selector {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.qbtn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.9rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.qbtn:hover {
+  border-color: var(--burgundy);
+  color: var(--burgundy-light);
+}
+
+.qbtn.active {
+  background: var(--burgundy);
+  color: #fff;
+  border-color: var(--burgundy);
+}
+
+.formation-type-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.formation-type-row label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.formation-type-row select {
+  max-width: 160px;
+}
+
+#formation-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-x: auto;
+  /* 매우 좁은 화면에서 가로 스크롤 → 행 구조 유지 */
+}
+
+.formation-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+  /* 줄바꿈 금지 → 포메이션 행 유지 */
+  align-items: stretch;
+}
+
+.pos-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.4rem;
+  min-width: 90px;
+  max-width: 140px;
+  flex: 1 1 90px;
+  /* 비율로 늘어나되 최소 너비 보장 */
+  text-align: center;
+}
+
+.pos-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--burgundy-light);
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.06em;
+}
+
+.pos-cell select {
+  width: 100%;
+  font-size: 0.74rem;
+  padding: 0.25rem 0.3rem;
+  margin-bottom: 0.2rem;
+}
+
+.pos-cell select:last-child {
+  margin-bottom: 0;
+}
+
+/* 포메이션 미리보기 */
+.formation-preview-wrapper {
+  margin-top: 0.75rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+#formation-preview-canvas {
+  width: 100%;
+  display: block;
+}
+
+.export-formation-row {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: center;
+}
+
+/* --- 스코어 입력 --- */
+.score-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.score-row:last-child {
+  border-bottom: 0;
+}
+
+.q-label {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--burgundy-light);
+  width: 2rem;
+}
+
+.score-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.score-inputs .score-input {
+  width: 70px;
+  text-align: center;
+}
+
+.score-sep {
+  font-weight: 700;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+.team-label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* --- 개인 스탯 테이블 --- */
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-table th {
+  background: var(--surface-2);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.stats-table td input {
+  width: 70px;
+}
+
+.num-cell {
+  text-align: center !important;
+}
+
+/* 저장 버튼 */
+.save-buttons-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.save-buttons-row button {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.6rem 1rem;
+  font-size: 0.92rem;
+}
+
+#draft-save-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+#draft-save-btn:hover {
+  border-color: var(--green-light);
+}
+
+#new-match-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+#new-match-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* 중복 경고 */
+.dup-box {
+  background: var(--burgundy-dim);
+  border: 1px solid var(--burgundy);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.dup-box.danger-box {
+  background: rgba(230, 57, 70, 0.08);
+  border-color: var(--red);
+}
+
+.dup-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.btn-overwrite {
+  background: var(--burgundy);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ============================================
+   Tab 2 - 시즌 통계
+   ============================================ */
+.stats-summary-bar {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.summary-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  text-align: center;
+  min-width: 100px;
+}
+
+.summary-num {
+  display: block;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--burgundy-light);
+  line-height: 1;
+}
+
+.summary-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leaderboard-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.leaderboard-card h3 {
+  font-size: 0.95rem;
+  color: var(--burgundy-light);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--burgundy-dim);
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.leaderboard-table th {
+  background: var(--surface-2);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.3rem 0.5rem;
+}
+
+.leaderboard-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.leaderboard-table .rank-cell {
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.leaderboard-table .name-cell {
+  font-weight: 500;
+}
+
+.leaderboard-table tr.top-1 td {
+  color: #c9a84c;
+  font-weight: 700;
+}
+
+.leaderboard-table tr.top-2 td {
+  color: #b0b0b0;
+  font-weight: 600;
+}
+
+.leaderboard-table tr.top-3 td {
+  color: #a0714a;
+  font-weight: 600;
+}
+
+/* --- Formation overview panel (all-quarters mini-map) --- */
+.formation-overview-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.formation-overview-panel h4 {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.overview-quarter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.overview-q-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--burgundy-light);
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+.overview-canvas {
+  width: 100%;
+  display: block;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.csv-upload-section {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.csv-upload-section h3 {
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.hint-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.export-row {
+  display: flex;
+  justify-content: center;
+}
+
+/* ============================================
+   Tab 3 - 기록 조회
+   ============================================ */
+.history-selector-row {
+  margin-bottom: 1rem;
+}
+
+.history-select {
+  width: 100%;
+  max-width: 600px;
+}
+
+.match-detail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.match-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.match-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.match-detail-title h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.match-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge.draft {
+  background: rgba(240, 180, 41, 0.15);
+  color: var(--gold);
+}
+
+.status-badge.final {
+  background: rgba(82, 183, 136, 0.15);
+  color: var(--green-light);
+}
+
+.detail-score-summary {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: var(--green-dark);
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+}
+
+.total-score {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.score-number {
+  font-size: 2rem;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.score-colon {
+  font-size: 1.5rem;
+  color: var(--text-muted);
+}
+
+.score-team {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.quarter-scores {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.score-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.score-badge {
+  background: var(--surface-2);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.detail-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.detail-tab-btn {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.detail-tab-btn.active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+}
+
+.formation-image {
+  width: 100%;
+  border-radius: var(--radius);
+  display: block;
+}
+
+.check-yes {
+  color: var(--green-light);
+  font-weight: 700;
+  text-align: center;
+}
+
+.check-no {
+  color: var(--border);
+  text-align: center;
+}
+
+/* ============================================
+   Tab 4 - 선수단 관리
+   ============================================ */
+.roster-add-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.roster-add-card h3 {
+  margin-bottom: 0.6rem;
+  font-size: 0.95rem;
+}
+
+.roster-add-form {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.roster-add-form input {
+  flex: 1;
+  min-width: 150px;
+}
+
+.roster-add-form select {
+  max-width: 120px;
+}
+
+.roster-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 700px) {
+  .roster-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.roster-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.roster-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.count-badge {
+  background: rgba(82, 183, 136, 0.15);
+  color: var(--green-light);
+  border-radius: 20px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.count-badge.guest {
+  background: rgba(240, 180, 41, 0.15);
+  color: var(--gold);
+}
+
+.roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.roster-table th,
+.roster-table td {
+  padding: 0.38rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.roster-table th {
+  background: var(--surface-2);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.roster-name {
+  font-weight: 500;
+}
+
+.role-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.role-badge.member {
+  background: rgba(82, 183, 136, 0.15);
+  color: var(--green-light);
+}
+
+.role-badge.guest {
+  background: rgba(240, 180, 41, 0.15);
+  color: var(--gold);
+}
+
+.roster-actions {
+  display: flex;
+  gap: 0.3rem;
+  justify-content: flex-end;
+}
+
+/* --- 빈 상태 --- */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  margin-bottom: 0.5rem;
+}
+
+.empty-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* --- Flatpickr 다크 테마 커스터마이징 --- */
+.flatpickr-calendar {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow) !important;
+  font-family: 'Pretendard', sans-serif !important;
+}
+
+.flatpickr-months,
+.flatpickr-weekdays {
+  background: var(--surface-2) !important;
+  border-radius: var(--radius) var(--radius) 0 0 !important;
+}
+
+.flatpickr-day {
+  color: var(--text) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.flatpickr-day:hover {
+  background: var(--surface-2) !important;
+  border-color: var(--gold) !important;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+  color: #0d1117 !important;
+  font-weight: 700 !important;
+}
+
+.flatpickr-day.today:not(.selected) {
+  border-color: var(--green-light) !important;
+  color: var(--green-light) !important;
+}
+
+.flatpickr-current-month .cur-month,
+.flatpickr-current-month .numInputWrapper span {
+  color: var(--text) !important;
+}
+
+.flatpickr-prev-month svg,
+.flatpickr-next-month svg {
+  fill: var(--text-muted) !important;
+}
+
+.flatpickr-weekday {
+  color: var(--gold) !important;
+  font-weight: 600 !important;
+}
+
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover {
+  color: var(--border) !important;
+}
+
+#match-date {
+  cursor: pointer;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+
+/* --- 반응형 --- */
+@media (max-width: 600px) {
+  .main-container {
+    padding: 0.75rem 0.75rem;
+  }
+
+  .app-header {
+    padding: 0 0.75rem;
+  }
+
+  .tab-nav {
+    padding: 0.5rem 0.75rem 0;
+  }
+
+  .tab-btn {
+    font-size: 0.82rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .formation-row {
+    gap: 0.3rem;
+  }
+
+  .pos-cell {
+    min-width: 90px;
+  }
+}

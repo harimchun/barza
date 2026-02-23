@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⚽ FC 바르자 팀 매니저</title>
+  <meta name="description" content="FC 바르자 풋살팀 운영 시스템 - 포메이션, 스쿼드, 시즌 스탯 관리">
+  <!-- Pretendard 폰트 -->
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+  <!-- Flatpickr 날짜 선택기 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+
+</head>
+
+<body>
+
+  <!-- ========== HEADER ========== -->
+  <header class="app-header">
+    <div class="header-logo">
+      <span class="badge">⚽</span>
+      <span class="name">FC 바르자 팀 매니저</span>
+    </div>
+    <div class="header-right">
+      <span id="auth-status">DB 연결 중...</span>
+      <button id="auth-btn" class="auth-btn">⏳ 로딩 중</button>
+    </div>
+  </header>
+
+  <!-- ========== TAB NAVIGATION ========== -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="tab1">📋 당일 경기 운영</button>
+    <button class="tab-btn" data-tab="tab2">📈 시즌 스탯</button>
+    <button class="tab-btn" data-tab="tab3">📚 기록 조회 &amp; 수정</button>
+    <button class="tab-btn" data-tab="tab4">👥 선수단 관리</button>
+  </nav>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <main class="main-container">
+
+    <!-- ================================================
+       TAB 1: 당일 경기 운영
+       ================================================ -->
+    <div id="tab1" class="tab-panel active">
+      <div id="edit-mode-notice"></div>
+
+      <!-- 경기 기본 정보 -->
+      <div class="card">
+        <div class="card-title">경기 정보</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="match-date">📅 경기 날짜</label>
+            <input type="date" id="match-date">
+          </div>
+          <div class="form-group">
+            <label for="match-location">📍 경기 장소</label>
+            <select id="match-location">
+              <option value="잠실유수지">잠실유수지</option>
+              <option value="탄천유수지">탄천유수지</option>
+              <option value="송파여성축구장">송파여성축구장</option>
+              <option value="천마축구장">천마축구장</option>
+              <option value="__custom__">+ 다른 경기장 추가...</option>
+            </select>
+            <div id="venue-custom-row" style="display:none; margin-top:0.4rem; display:flex; gap:0.4rem">
+              <input type="text" id="venue-custom-input" placeholder="경기장 이름 입력">
+              <button id="venue-add-btn" class="btn-secondary" style="white-space:nowrap">추가</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="match-opponent">🆚 상대팀</label>
+            <input type="text" id="match-opponent" value="상대팀" placeholder="예: 청팀">
+          </div>
+        </div>
+      </div>
+
+      <!-- 참석자 & 포메이션 2컬럼 -->
+      <div class="match-main-layout">
+
+        <!-- 왼쪽: 참석자 -->
+        <div>
+          <div class="card">
+            <div class="card-title">1. 참석자 선택</div>
+            <div class="guest-add-row">
+              <input type="text" id="guest-name-input" placeholder="게스트(용병) 이름">
+              <button id="add-guest-btn" class="btn-secondary">+ 추가</button>
+            </div>
+            <div id="player-checklist" class="player-checklist">
+              <p class="empty-hint" style="padding:0.5rem">로그인 후 명단이 표시됩니다.</p>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">쿼터별 출전 현황</div>
+            <div id="squad-table-container">
+              <p class="empty-hint">참석자를 선택하세요.</p>
+            </div>
+            <div id="playtime-stats"></div>
+          </div>
+        </div>
+
+        <!-- 오른쪽: 포메이션 빌더 -->
+        <div>
+          <div class="card">
+            <div class="card-title">2. 포메이션 배치</div>
+
+            <div id="quarter-selector">
+              <button class="qbtn active" data-q="1Q">1Q</button>
+              <button class="qbtn" data-q="2Q">2Q</button>
+              <button class="qbtn" data-q="3Q">3Q</button>
+              <button class="qbtn" data-q="4Q">4Q</button>
+            </div>
+
+            <div class="formation-type-row">
+              <label for="formation-type-select">⚙️ 포메이션</label>
+              <select id="formation-type-select">
+                <option value="4-2-3-1">4-2-3-1</option>
+                <option value="4-3-3">4-3-3</option>
+                <option value="4-4-2">4-4-2</option>
+                <option value="3-5-2">3-5-2</option>
+              </select>
+            </div>
+
+            <div id="formation-builder"></div>
+
+            <div class="formation-preview-wrapper" style="margin-top:1rem">
+              <canvas id="formation-preview-canvas" width="560" height="380"></canvas>
+            </div>
+
+            <div class="export-formation-row">
+              <button id="export-formation-btn" class="btn-secondary" style="margin-top:0.75rem">
+                📸 1~4쿼터 전체 포메이션 다운로드
+              </button>
+            </div>
+          </div>
+
+          <!-- 전체 쿼터 미리보기 -->
+          <div class="formation-overview-panel" style="margin-top:0.75rem">
+            <h4>📋 전체 쿼터 포메이션 개요</h4>
+            <div class="overview-grid">
+              <div class="overview-quarter">
+                <div class="overview-q-label">1Q</div>
+                <canvas id="overview-canvas-1Q" class="overview-canvas" width="280" height="190"></canvas>
+              </div>
+              <div class="overview-quarter">
+                <div class="overview-q-label">2Q</div>
+                <canvas id="overview-canvas-2Q" class="overview-canvas" width="280" height="190"></canvas>
+              </div>
+              <div class="overview-quarter">
+                <div class="overview-q-label">3Q</div>
+                <canvas id="overview-canvas-3Q" class="overview-canvas" width="280" height="190"></canvas>
+              </div>
+              <div class="overview-quarter">
+                <div class="overview-q-label">4Q</div>
+                <canvas id="overview-canvas-4Q" class="overview-canvas" width="280" height="190"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 스코어 & 스탯 & 저장 -->
+      <div class="match-main-layout">
+        <div class="card">
+          <div class="card-title">3. 쿼터별 스코어</div>
+          <div id="scores-section"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">4. 개인 스탯 입력</div>
+          <div id="stats-section">
+            <p class="empty-hint">참석자를 선택하면 활성화됩니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">5. 저장</div>
+        <div class="save-buttons-row">
+          <button id="new-match-btn">🔄 새 경기</button>
+          <button id="draft-save-btn">💾 임시 저장 (Draft)</button>
+          <button id="final-save-btn" class="btn-primary">✅ 확정 저장 (통계 반영)</button>
+        </div>
+        <div id="duplicate-warning" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- ================================================
+       TAB 2: 시즌 스탯
+       ================================================ -->
+    <div id="tab2" class="tab-panel">
+      <div id="tab2-content">
+        <div class="empty-state">
+          <p>⚽ 로그인 후 시즌 통계가 표시됩니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================
+       TAB 3: 기록 조회 & 수정
+       ================================================ -->
+    <div id="tab3" class="tab-panel">
+      <div id="tab3-content">
+        <div class="empty-state">
+          <p>📚 로그인 후 경기 기록이 표시됩니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================
+       TAB 4: 선수단 관리
+       ================================================ -->
+    <div id="tab4" class="tab-panel">
+      <div id="tab4-content">
+        <div class="empty-state">
+          <p>👥 로그인 후 선수단 명단이 표시됩니다.</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast 컨테이너 -->
+  <div id="toast-container"></div>
+
+  <!-- ========== SCRIPTS ========== -->
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/formation.js"></script>
+  <script src="js/tab1_match.js"></script>
+  <script src="js/tab2_stats.js"></script>
+  <script src="js/tab3_history.js"></script>
+  <script src="js/tab4_roster.js"></script>
+
+</body>
+
+</html>
