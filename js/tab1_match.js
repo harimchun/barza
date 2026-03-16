@@ -61,44 +61,49 @@ function renderFormationOverview() {
             return;
         }
 
-        const positions = Object.keys(formation);
-        const formationType = AppState.formationTypes[q] || '4-2-3-1';
-        // 포지션별 y좌표 계산 (피치를 행으로 나눔)
-        const rows = {
-            GK: 0.88, LB: 0.72, RB: 0.72, LCB: 0.72, RCB: 0.72, CB: 0.72,
-            LDM: 0.57, RDM: 0.57, CDM: 0.57,
-            LM: 0.42, CM: 0.42, RM: 0.42, LW: 0.42, RW: 0.42, CAM: 0.42,
-            ST: 0.15, CF: 0.15
+        // 포지션별 (yRatio, xRatio) 매핑 — POS_COORDS의 100x70 pitch 기준과 일치
+        // pitch x: 0=GK side → 100=ST side (왼쪽=수비, 오른쪽=공격)
+        // canvas: overview는 top=GK, bottom=ST 세로 레이아웃으로 표시
+        // x → W, y → H 방향으로 매핑
+        const POS_XY = {
+            'GK': { y: 0.88, x: 0.50 },
+            'LB': { y: 0.72, x: 0.15 }, 'LCB': { y: 0.72, x: 0.35 },
+            'RCB': { y: 0.72, x: 0.65 }, 'RB': { y: 0.72, x: 0.85 },
+            'CB': { y: 0.72, x: 0.50 },
+            'LDM': { y: 0.57, x: 0.33 }, 'RDM': { y: 0.57, x: 0.67 }, 'CDM': { y: 0.57, x: 0.50 },
+            'LCM': { y: 0.42, x: 0.20 }, 'CM': { y: 0.42, x: 0.50 }, 'RCM': { y: 0.42, x: 0.80 },
+            'LM': { y: 0.42, x: 0.15 }, 'RM': { y: 0.42, x: 0.85 },
+            'CAM': { y: 0.42, x: 0.50 },
+            'LW': { y: 0.28, x: 0.20 }, 'RW': { y: 0.28, x: 0.80 },
+            'ST': { y: 0.15, x: 0.50 }, 'CF': { y: 0.15, x: 0.50 },
+            'MF0': { y: 0.42, x: 0.20 }, 'MF1': { y: 0.42, x: 0.50 }, 'MF2': { y: 0.42, x: 0.80 },
+            'LCM_442': { y: 0.42, x: 0.33 }, 'RCM_442': { y: 0.42, x: 0.67 },
         };
-        const rowPlayers = {};
-        positions.forEach(pos => {
-            const player = formation[pos];
-            if (!player) return;
-            const yRatio = rows[pos] || 0.5;
-            if (!rowPlayers[yRatio]) rowPlayers[yRatio] = [];
-            rowPlayers[yRatio].push({ pos, player });
-        });
 
-        Object.entries(rowPlayers).forEach(([yRatio, items]) => {
-            const y = H * parseFloat(yRatio);
-            items.forEach((item, i) => {
-                const x = W * (i + 1) / (items.length + 1);
-                // 점
-                ctx.beginPath();
-                ctx.arc(x, y, W * 0.038, 0, Math.PI * 2);
-                ctx.fillStyle = '#8C1C2B';
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-                // 이름 (앞 2글자)
-                ctx.fillStyle = '#fff';
-                ctx.font = `bold ${W * 0.055}px Pretendard, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'top';
-                const name = (item.player || '').slice(0, 2);
-                ctx.fillText(name, x, y + W * 0.045);
-            });
+        // 4-4-2의 LCM/RCM 처리: 실제 포지션 키로 매핑
+        const formationType = AppState.formationTypes[q] || '4-2-3-1';
+        const posEntries = Object.entries(formation).filter(([, player]) => player && player !== '-');
+
+        posEntries.forEach(([pos, player]) => {
+            const coord = POS_XY[pos];
+            const cx = coord ? W * coord.x : W * 0.5;
+            const cy = coord ? H * coord.y : H * 0.5;
+            const r = W * 0.038;
+            // 점
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = '#8C1C2B';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            // 이름 (앞 2글자)
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${W * 0.055}px Pretendard, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const name = (player || '').slice(0, 2);
+            ctx.fillText(name, cx, cy + r + 1);
         });
     });
 }
@@ -280,17 +285,37 @@ function renderFormationBuilder() {
 
     container.innerHTML = rowsHtml;
 
+    // 특정 쿼터에서 선수가 포메이션에 배정되어 있는지 확인하는 헬퍼
+    function isPlayerInFormation(playerName, quarter) {
+        const fMap = AppState.formationState[quarter];
+        const fSubs = AppState.formationSubs[quarter];
+        for (const pos in fMap) {
+            if (fMap[pos] === playerName && fMap[pos] !== '-') return true;
+            if (fSubs[pos] === playerName && fSubs[pos] !== '-') return true;
+        }
+        return false;
+    }
+
     // 이벤트 핸들러
     container.querySelectorAll('.pos-main-sel').forEach(sel => {
         sel.addEventListener('change', () => {
             const pos = sel.dataset.pos;
+            const oldVal = AppState.formationState[q][pos];
             const val = sel.value;
             AppState.formationState[q][pos] = val;
-            // 해당 선수 squadron 자동 체크
+
+            // 새로 배정된 선수 squadPlan 자동 체크
             if (val !== '-') {
                 if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
                 AppState.squadPlan[val][q] = true;
             }
+            // 교체된 이전 선수가 해당 쿼터에 더 이상 없으면 squadPlan 해제
+            if (oldVal && oldVal !== '-' && oldVal !== val) {
+                if (!isPlayerInFormation(oldVal, q)) {
+                    if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
+                }
+            }
+
             renderFormationBuilder();
             renderSquadTable();
             renderPlaytimeStats();
@@ -302,12 +327,22 @@ function renderFormationBuilder() {
     container.querySelectorAll('.pos-sub-sel').forEach(sel => {
         sel.addEventListener('change', () => {
             const pos = sel.dataset.pos;
+            const oldVal = AppState.formationSubs[q][pos];
             const val = sel.value;
             AppState.formationSubs[q][pos] = val;
+
+            // 새로 배정된 교체 선수 squadPlan 자동 체크
             if (val !== '-') {
                 if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
                 AppState.squadPlan[val][q] = true;
             }
+            // 교체된 이전 교체 선수가 해당 쿼터에 더 이상 없으면 squadPlan 해제
+            if (oldVal && oldVal !== '-' && oldVal !== val) {
+                if (!isPlayerInFormation(oldVal, q)) {
+                    if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
+                }
+            }
+
             renderFormationBuilder();
             renderSquadTable();
             renderPlaytimeStats();
