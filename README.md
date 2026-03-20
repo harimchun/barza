@@ -9,7 +9,7 @@
 ### 1단계: Firebase 프로젝트 만들기
 
 1. [Firebase 콘솔](https://console.firebase.google.com/) 접속 (Google 계정 로그인)
-2. **"프로젝트 추가"** 클릭 → 이름: `FC Barja` → 만들기
+2. **"프로젝트 추가"** 클릭 → 이름: `FC Barza` → 만들기
 
 ### 2단계: Realtime Database 생성
 
@@ -33,11 +33,11 @@ Database 탭 → **"규칙"** 탭 → 아래 내용으로 교체 후 **"게시"*
 
 ### 4단계: DB URL 복사 → config.js 에 붙여넣기
 
-Database 탭 상단에 표시된 URL (`https://fc-barja-xxxxx-default-rtdb.firebaseio.com`) 을 복사하여  
+Database 탭 상단에 표시된 URL (`https://fc-barza-xxxxx-default-rtdb.firebaseio.com`) 을 복사하여  
 `js/config.js` 파일을 열고:
 
 ```js
-FIREBASE_DB_URL: 'https://fc-barja-xxxxx-default-rtdb.firebaseio.com',
+FIREBASE_DB_URL: 'https://fc-barza-xxxxx-default-rtdb.firebaseio.com',
 ```
 
 ---

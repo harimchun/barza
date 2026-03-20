@@ -176,7 +176,7 @@ function switchTab(tabId) {
 const DEFAULT_VENUES = ['\uc7a0\uc2e4\uc720\uc218\uc9c0', '\ud0c4\ucc9c\uc720\uc218\uc9c0', '\uc1a1\ud30c\uc5ec\uc131\ucd95\uad6c\uc7a5', '\ucc9c\ub9c8\ucd95\uad6c\uc7a5'];
 
 function getCustomVenues() {
-    try { return JSON.parse(localStorage.getItem('fc_barja_venues') || '[]'); }
+    try { return JSON.parse(localStorage.getItem('fc_barza_venues') || '[]'); }
     catch { return []; }
 }
 
@@ -184,7 +184,7 @@ function saveCustomVenue(name) {
     const list = getCustomVenues();
     if (!list.includes(name) && !DEFAULT_VENUES.includes(name)) {
         list.push(name);
-        localStorage.setItem('fc_barja_venues', JSON.stringify(list));
+        localStorage.setItem('fc_barza_venues', JSON.stringify(list));
     }
 }
 

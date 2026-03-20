@@ -197,7 +197,7 @@ function exportSeasonCsv() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `fc_barja_season_stats.csv`;
+    a.download = `fc_barza_season_stats.csv`;
     a.click();
     URL.revokeObjectURL(url);
 }
