@@ -55,7 +55,7 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
     ctx.font = `bold ${Math.max(11, w * 0.032)}px "Inter", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`FC BARJA  ${quarter}  (${fType || '?'})`, ox + w / 2, oy + 14);
+    ctx.fillText(`FC BARZA  ${quarter}  (${fType || '?'})`, ox + w / 2, oy + 14);
     ctx.restore();
 
     // --- 선수 마커 ---
@@ -161,7 +161,7 @@ function exportCombinedFormation() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `fc_barja_formations_${AppState.matchDate}.png`;
+        a.download = `fc_barza_formations_${AppState.matchDate}.png`;
         a.click();
         URL.revokeObjectURL(url);
     }, 'image/png');
