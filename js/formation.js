@@ -93,10 +93,10 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
         ctx.fillText(pos, px, py);
         ctx.restore();
 
-        // 선수 이름
+        // 선수 이름 (교체 있으면 "out / in" 형식으로 표시)
         const subPlayer = fSubs[pos];
         const hasSubPlayer = subPlayer && subPlayer !== '-';
-        const nameStr = hasSubPlayer ? `${player}` : player;
+        const nameStr = hasSubPlayer ? `${player} / ${subPlayer}` : player;
 
         ctx.save();
         ctx.fillStyle = '#ffffff';
@@ -105,28 +105,6 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
         ctx.textBaseline = 'top';
         ctx.fillText(nameStr, px, py + radius + 2);
         ctx.restore();
-
-        // 교체 선수
-        if (hasSubPlayer) {
-            // 교체 마커
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(px + radius * 0.9, py - radius * 0.9, radius * 0.65, 0, Math.PI * 2);
-            ctx.fillStyle = '#e63946';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.restore();
-
-            ctx.save();
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${Math.max(7, radius * 0.45)}px "Apple Gothic", "Malgun Gothic", "NanumGothic", sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText(subPlayer, px, py + radius + 14);
-            ctx.restore();
-        }
     }
 }
 
