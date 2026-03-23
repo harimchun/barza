@@ -7,11 +7,11 @@ function renderTab1() {
     renderPlayerChecklist();
     renderSquadTable();
     renderPlaytimeStats();
-    renderScoreInputs();
-    renderStatsTable();
+    renderLiveRecorder();
     renderFormationBuilder();
     updateEditModeNotice();
     renderFormationOverview();
+    updateAutoSaveStatus();
 }
 
 function updateEditModeNotice() {
@@ -133,7 +133,7 @@ function renderPlayerChecklist() {
             }
             renderSquadTable();
             renderPlaytimeStats();
-            renderStatsTable();
+            renderLiveRecorder();
             renderFormationBuilder(); // 드롭다운 옵션 업데이트
         });
     });
@@ -440,67 +440,194 @@ function renderFormationBuilder() {
     });
 }
 
-// ── 스코어 입력 ─────────────────────────────────────────────────────────────
-function renderScoreInputs() {
-    const container = document.getElementById('scores-section');
-    if (!container) return;
-    container.innerHTML = QUARTERS.map(q => {
-        const [us, them] = AppState.quarterScores[q];
-        return `
-      <div class="score-row">
-        <span class="q-label">${q}</span>
-        <div class="score-inputs">
-          <span class="team-label">🔵 바르자</span>
-          <input type="number" class="score-input" data-q="${q}" data-side="us" min="0" value="${us}">
-          <span class="score-sep">:</span>
-          <input type="number" class="score-input" data-q="${q}" data-side="them" min="0" value="${them}">
-          <span class="team-label">🔴 상대팀</span>
-        </div>
-      </div>`;
-    }).join('');
+// ── 이벤트 → 스코어/스탯 자동 계산 ─────────────────────────────────────────
+function recalcFromEvents() {
+    // 쿼터별 스코어 초기화
+    AppState.quarterScores = { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
+    AppState.matchStats = {};
 
-    container.querySelectorAll('.score-input').forEach(inp => {
-        inp.addEventListener('change', () => {
-            const q = inp.dataset.q;
-            const side = inp.dataset.side;
-            const val = parseInt(inp.value) || 0;
-            if (side === 'us') AppState.quarterScores[q][0] = val;
-            else AppState.quarterScores[q][1] = val;
-        });
+    AppState.matchEvents.forEach(ev => {
+        const q = ev.quarter;
+        if (ev.type === 'goal') {
+            AppState.quarterScores[q][0] += 1;
+            // 득점자 스탯
+            if (ev.scorer) {
+                if (!AppState.matchStats[ev.scorer]) AppState.matchStats[ev.scorer] = { goals: 0, assists: 0 };
+                AppState.matchStats[ev.scorer].goals += 1;
+            }
+            // 어시스트 스탯
+            if (ev.assister) {
+                if (!AppState.matchStats[ev.assister]) AppState.matchStats[ev.assister] = { goals: 0, assists: 0 };
+                AppState.matchStats[ev.assister].assists += 1;
+            }
+        } else if (ev.type === 'opponentGoal') {
+            AppState.quarterScores[q][1] += 1;
+        }
     });
 }
 
-// ── 개인 스탯 테이블 ────────────────────────────────────────────────────────
-function renderStatsTable() {
-    const container = document.getElementById('stats-section');
-    if (!container || AppState.attendees.length === 0) {
-        if (container) container.innerHTML = '<p class="empty-hint">참석자를 선택하면 스탯 입력이 활성화됩니다.</p>';
+// ── 실시간 기록판 ────────────────────────────────────────────────────────────
+function renderLiveRecorder() {
+    const container = document.getElementById('live-recorder');
+    if (!container) return;
+
+    if (AppState.attendees.length === 0) {
+        container.innerHTML = '<p class="empty-hint">참석자를 선택하면 기록이 활성화됩니다.</p>';
         return;
     }
-    const rows = AppState.attendees.map(name => {
-        const s = AppState.matchStats[name] || { goals: 0, assists: 0 };
-        return `
-      <tr>
-        <td>${formatPlayerName(name)}</td>
-        <td><input type="number" class="stat-input" data-name="${name}" data-field="goals" min="0" value="${s.goals}"></td>
-        <td><input type="number" class="stat-input" data-name="${name}" data-field="assists" min="0" value="${s.assists}"></td>
-      </tr>`;
+
+    const lq = AppState.liveQuarter;
+
+    // 전체 스코어 요약
+    const totalUs = QUARTERS.reduce((a, q) => a + AppState.quarterScores[q][0], 0);
+    const totalThem = QUARTERS.reduce((a, q) => a + AppState.quarterScores[q][1], 0);
+
+    // 참석자 드롭다운 옵션
+    const playerOpts = AppState.attendees.map(n =>
+        `<option value="${n}">${formatPlayerName(n)}</option>`
+    ).join('');
+
+    // 쿼터별 이벤트 로그
+    const eventsHtml = QUARTERS.map(q => {
+        const qEvents = AppState.matchEvents.filter(e => e.quarter === q);
+        const [us, them] = AppState.quarterScores[q];
+        const evList = qEvents.length === 0
+            ? '<span class="empty-hint" style="font-size:0.75rem">기록 없음</span>'
+            : qEvents.map((ev, idx) => {
+                const globalIdx = AppState.matchEvents.indexOf(ev);
+                if (ev.type === 'goal') {
+                    const assStr = ev.assister ? `, 👟 ${ev.assister}` : '';
+                    return `<div class="event-item event-goal">
+                      <span>⚽ ${ev.scorer}${assStr}</span>
+                      <button class="event-delete" onclick="removeMatchEvent(${globalIdx})">✕</button>
+                    </div>`;
+                } else {
+                    return `<div class="event-item event-opponent">
+                      <span>🔴 상대팀 득점</span>
+                      <button class="event-delete" onclick="removeMatchEvent(${globalIdx})">✕</button>
+                    </div>`;
+                }
+            }).join('');
+
+        return `<div class="event-quarter-block ${q === lq ? 'active-quarter' : ''}">
+          <div class="event-quarter-header">
+            <span class="event-q-label">${q}</span>
+            <span class="event-q-score">${us} : ${them}</span>
+          </div>
+          <div class="event-list">${evList}</div>
+        </div>`;
     }).join('');
 
     container.innerHTML = `
-    <table class="stats-table">
-      <thead><tr><th>이름</th><th>⚽ 골</th><th>👟 어시스트</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+    <div class="live-score-summary">
+      <span class="live-team-name">FC 바르자</span>
+      <span class="live-total-score">${totalUs} : ${totalThem}</span>
+      <span class="live-team-name">${AppState.matchOpponent}</span>
+    </div>
 
-    container.querySelectorAll('.stat-input').forEach(inp => {
-        inp.addEventListener('change', () => {
-            const name = inp.dataset.name;
-            const field = inp.dataset.field;
-            if (!AppState.matchStats[name]) AppState.matchStats[name] = { goals: 0, assists: 0 };
-            AppState.matchStats[name][field] = parseInt(inp.value) || 0;
+    <div class="live-input-section">
+      <div class="live-quarter-selector">
+        ${QUARTERS.map(q => `<button class="live-qbtn ${q === lq ? 'active' : ''}" data-q="${q}">${q}</button>`).join('')}
+      </div>
+
+      <div class="live-action-row">
+        <select id="live-scorer" class="live-select">
+          <option value="">득점자 선택</option>
+          ${playerOpts}
+        </select>
+        <select id="live-assister" class="live-select">
+          <option value="">어시스트 (선택)</option>
+          <option value="">없음</option>
+          ${playerOpts}
+        </select>
+        <button id="live-add-goal" class="btn-goal">⚽ 골!</button>
+      </div>
+
+      <div class="live-action-row" style="margin-top:0.3rem">
+        <button id="live-add-opponent-goal" class="btn-opponent-goal">🔴 상대팀 득점</button>
+      </div>
+    </div>
+
+    <div class="event-log">
+      ${eventsHtml}
+    </div>`;
+
+    // 이벤트 핸들러
+    container.querySelectorAll('.live-qbtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            AppState.liveQuarter = btn.dataset.q;
+            renderLiveRecorder();
         });
     });
+
+    document.getElementById('live-add-goal').addEventListener('click', () => {
+        const scorer = document.getElementById('live-scorer').value;
+        if (!scorer) { showToast('득점자를 선택해주세요.', 'error'); return; }
+        const assister = document.getElementById('live-assister').value;
+        AppState.matchEvents.push({
+            quarter: AppState.liveQuarter,
+            type: 'goal',
+            scorer,
+            assister: assister || null,
+        });
+        recalcFromEvents();
+        renderLiveRecorder();
+        showToast(`⚽ ${scorer} 골!${assister ? ` (👟 ${assister})` : ''}`);
+    });
+
+    document.getElementById('live-add-opponent-goal').addEventListener('click', () => {
+        AppState.matchEvents.push({
+            quarter: AppState.liveQuarter,
+            type: 'opponentGoal',
+            scorer: null,
+            assister: null,
+        });
+        recalcFromEvents();
+        renderLiveRecorder();
+        showToast('🔴 상대팀 득점');
+    });
+}
+
+function removeMatchEvent(idx) {
+    AppState.matchEvents.splice(idx, 1);
+    recalcFromEvents();
+    renderLiveRecorder();
+}
+
+// ── 자동저장 ─────────────────────────────────────────────────────────────────
+function startAutoSave() {
+    stopAutoSave();
+    AppState.autoSaveTimer = setInterval(async () => {
+        if (!AppState.isEditor || AppState.attendees.length === 0) return;
+        try {
+            // 조용히 저장 (handleSave 로직 간소화)
+            await handleSave(true, true); // isDraft=true, overwrite=true
+            AppState.lastAutoSave = new Date();
+            updateAutoSaveStatus();
+        } catch (e) {
+            console.error('자동저장 실패:', e);
+        }
+    }, 2 * 60 * 1000); // 2분
+}
+
+function stopAutoSave() {
+    if (AppState.autoSaveTimer) {
+        clearInterval(AppState.autoSaveTimer);
+        AppState.autoSaveTimer = null;
+    }
+}
+
+function updateAutoSaveStatus() {
+    const el = document.getElementById('autosave-status');
+    if (!el) return;
+    if (AppState.lastAutoSave) {
+        const t = AppState.lastAutoSave;
+        const hh = String(t.getHours()).padStart(2, '0');
+        const mm = String(t.getMinutes()).padStart(2, '0');
+        el.textContent = `💾 자동저장: ${hh}:${mm} (2분 간격)`;
+    } else {
+        el.textContent = '💾 자동저장: 2분 간격으로 임시 저장됩니다';
+    }
 }
 
 // ── Tab 1 이벤트 초기화 ────────────────────────────────────────────────────
@@ -558,7 +685,7 @@ function initTab1Events() {
         renderPlayerChecklist();
         renderSquadTable();
         renderPlaytimeStats();
-        renderStatsTable();
+        renderLiveRecorder();
         renderFormationBuilder();
         showToast(`${name} (용병) 추가 완료!`);
     });
@@ -608,6 +735,10 @@ function initTab1Events() {
             showToast('새 경기 준비 완료!');
         }
     });
+
+    // 자동저장 시작
+    startAutoSave();
+    updateAutoSaveStatus();
 }
 
 // ── 저장 로직 ──────────────────────────────────────────────────────────────
@@ -664,6 +795,7 @@ async function handleSave(isDraft, overwrite = false) {
         formation_plan: JSON.parse(JSON.stringify(AppState.formationState)),
         formation_subs: JSON.parse(JSON.stringify(AppState.formationSubs)),
         match_stats: statsRecords,
+        match_events: JSON.parse(JSON.stringify(AppState.matchEvents || [])),
         is_draft: isDraft,
     };
 
@@ -759,6 +891,9 @@ function loadMatchToEditor(matchData) {
     (matchData.match_stats || []).forEach(row => {
         AppState.matchStats[row['이름']] = { goals: row['골'] || 0, assists: row['어시스트'] || 0 };
     });
+
+    // 이벤트 로그 복원
+    AppState.matchEvents = matchData.match_events || [];
 
     // UI 동기화
     const fp = document.getElementById('match-date')._flatpickr;

@@ -600,7 +600,10 @@ input[type="checkbox"] {
 #formation-builder {
   position: relative;
   width: 100%;
-  aspect-ratio: 68 / 105;
+  max-width: 560px;
+  aspect-ratio: 68 / 85;
+  max-height: 600px;
+  margin: 0 auto;
   background: linear-gradient(180deg,
       #1e5631 0%, #2d6a4f 15%, #236b3e 30%,
       #2d6a4f 45%, #236b3e 60%, #2d6a4f 75%,
@@ -878,72 +881,192 @@ input[type="checkbox"] {
   }
 }
 
-/* --- 스코어 입력 --- */
-.score-row {
+/* --- 실시간 기록판 --- */
+.live-score-summary {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.8rem;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
 }
 
-.score-row:last-child {
-  border-bottom: 0;
+.live-team-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
-.q-label {
+.live-total-score {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.08em;
+}
+
+.live-input-section {
+  padding: 0.75rem;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  margin-bottom: 0.75rem;
+}
+
+.live-quarter-selector {
+  display: flex;
+  gap: 0.3rem;
+  margin-bottom: 0.6rem;
+}
+
+.live-qbtn {
+  flex: 1;
+  padding: 0.35rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.live-qbtn:hover {
+  border-color: var(--burgundy);
+}
+
+.live-qbtn.active {
+  background: var(--burgundy);
+  color: #fff;
+  border-color: var(--burgundy);
+}
+
+.live-action-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.live-select {
+  flex: 1;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.5rem;
+  min-width: 0;
+}
+
+.btn-goal {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.btn-goal:hover {
+  transform: scale(1.03);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.btn-opponent-goal {
+  width: 100%;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-opponent-goal:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+/* 이벤트 로그 */
+.event-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.event-quarter-block {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.event-quarter-block.active-quarter {
+  border-color: var(--burgundy);
+}
+
+.event-quarter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
+  background: var(--bg);
+}
+
+.event-q-label {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--burgundy-light);
+}
+
+.event-q-score {
   font-weight: 700;
   font-size: 0.88rem;
-  color: var(--burgundy-light);
-  width: 2rem;
+  color: var(--text);
 }
 
-.score-inputs {
+.event-list {
+  padding: 0.35rem 0.6rem;
+}
+
+.event-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.score-inputs .score-input {
-  width: 70px;
-  text-align: center;
-}
-
-.score-sep {
-  font-weight: 700;
-  color: var(--text-muted);
-  font-size: 1.1rem;
-}
-
-.team-label {
+  justify-content: space-between;
+  padding: 0.25rem 0;
   font-size: 0.82rem;
+}
+
+.event-item + .event-item {
+  border-top: 1px solid var(--border);
+}
+
+.event-goal span {
+  color: var(--green-light);
+}
+
+.event-opponent span {
+  color: #f87171;
+}
+
+.event-delete {
+  background: none;
+  border: none;
   color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+  border-radius: 3px;
+  transition: var(--transition);
 }
 
-/* --- 개인 스탯 테이블 --- */
-.stats-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.stats-table th,
-.stats-table td {
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-}
-
-.stats-table th {
-  background: var(--surface-2);
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.stats-table td input {
-  width: 70px;
+.event-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
 }
 
 .num-cell {

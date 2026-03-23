@@ -167,23 +167,15 @@
         </div>
       </div>
 
-      <!-- 스코어 & 스탯 & 저장 -->
-      <div class="match-main-layout">
-        <div class="card">
-          <div class="card-title">3. 쿼터별 스코어</div>
-          <div id="scores-section"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">4. 개인 스탯 입력</div>
-          <div id="stats-section">
-            <p class="empty-hint">참석자를 선택하면 활성화됩니다.</p>
-          </div>
-        </div>
+      <!-- 실시간 기록 + 저장 -->
+      <div class="card">
+        <div class="card-title">3. 실시간 기록</div>
+        <div id="live-recorder"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">5. 저장</div>
+        <div class="card-title">4. 저장</div>
+        <div id="autosave-status" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem"></div>
         <div class="save-buttons-row">
           <button id="new-match-btn" class="editor-only">🔄 새 경기</button>
           <button id="draft-save-btn" class="editor-only">💾 임시 저장 (Draft)</button>

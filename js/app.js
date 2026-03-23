@@ -87,8 +87,14 @@ const AppState = {
     formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: name } }
     quarterScores: { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] },
     matchStats: {},  // { name: { goals: 0, assists: 0 } }
+    matchEvents: [], // [{ quarter, type:'goal'|'opponentGoal', scorer, assister }]
+    liveQuarter: '1Q',
     editModeId: null,
     currentQuarter: '1Q',
+
+    // 자동저장
+    autoSaveTimer: null,
+    lastAutoSave: null,
 
     // UI 임시 상태
     dupConfirmId: null,
@@ -141,10 +147,14 @@ function resetMatchState() {
     AppState.formationSubs = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
     AppState.quarterScores = { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
     AppState.matchStats = {};
+    AppState.matchEvents = [];
+    AppState.liveQuarter = '1Q';
     AppState.editModeId = null;
     AppState.currentQuarter = '1Q';
     AppState.dupConfirmId = null;
     AppState.dupConfirmAction = null;
+    AppState.lastAutoSave = null;
+    stopAutoSave();
 }
 
 function showToast(msg, type = 'success') {
