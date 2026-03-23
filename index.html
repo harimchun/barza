@@ -111,27 +111,28 @@
           <div class="card">
             <div class="card-title">2. 포메이션 배치</div>
 
-            <div id="quarter-selector">
-              <button class="qbtn active" data-q="1Q">1Q</button>
-              <button class="qbtn" data-q="2Q">2Q</button>
-              <button class="qbtn" data-q="3Q">3Q</button>
-              <button class="qbtn" data-q="4Q">4Q</button>
+            <div class="formation-header">
+              <div class="formation-header-left">
+                <div id="quarter-selector">
+                  <button class="qbtn active" data-q="1Q">1Q</button>
+                  <button class="qbtn" data-q="2Q">2Q</button>
+                  <button class="qbtn" data-q="3Q">3Q</button>
+                  <button class="qbtn" data-q="4Q">4Q</button>
+                </div>
+              </div>
+              <div class="formation-type-row">
+                <label for="formation-type-select">포메이션</label>
+                <select id="formation-type-select">
+                  <option value="4-2-3-1">4-2-3-1</option>
+                  <option value="4-3-3">4-3-3</option>
+                  <option value="4-4-2">4-4-2</option>
+                  <option value="3-5-2">3-5-2</option>
+                </select>
+              </div>
             </div>
 
-            <div class="formation-type-row">
-              <label for="formation-type-select">⚙️ 포메이션</label>
-              <select id="formation-type-select">
-                <option value="4-2-3-1">4-2-3-1</option>
-                <option value="4-3-3">4-3-3</option>
-                <option value="4-4-2">4-4-2</option>
-                <option value="3-5-2">3-5-2</option>
-              </select>
-            </div>
-
-            <div id="formation-builder"></div>
-
-            <div class="formation-preview-wrapper" style="margin-top:1rem">
-              <canvas id="formation-preview-canvas" width="560" height="380"></canvas>
+            <div id="formation-builder">
+              <!-- 피치 라인 요소 (JS에서 동적으로 추가) -->
             </div>
 
             <div class="export-formation-row">

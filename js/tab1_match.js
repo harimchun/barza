@@ -10,7 +10,6 @@ function renderTab1() {
     renderScoreInputs();
     renderStatsTable();
     renderFormationBuilder();
-    updateFormationPreview();
     updateEditModeNotice();
     renderFormationOverview();
 }
@@ -210,7 +209,75 @@ function renderPlaytimeStats() {
     </div>`;
 }
 
-// ── 포메이션 빌더 ──────────────────────────────────────────────────────────
+// ── 포메이션 빌더 (피치 위 비주얼 배치) ──────────────────────────────────
+
+// 포지션 좌표: { left%, top% } — 세로 피치 (ST=상단, GK=하단)
+// top은 타이틀바(~5%) 고려하여 오프셋 적용
+const PITCH_POS_COORDS = {
+    '4-2-3-1': {
+        'ST':  { left: 50, top: 13 },
+        'LW':  { left: 18, top: 28 },
+        'CAM': { left: 50, top: 33 },
+        'RW':  { left: 82, top: 28 },
+        'LDM': { left: 35, top: 50 },
+        'RDM': { left: 65, top: 50 },
+        'LB':  { left: 12, top: 70 },
+        'LCB': { left: 37, top: 73 },
+        'RCB': { left: 63, top: 73 },
+        'RB':  { left: 88, top: 70 },
+        'GK':  { left: 50, top: 90 },
+    },
+    '4-3-3': {
+        'LW':  { left: 20, top: 15 },
+        'ST':  { left: 50, top: 13 },
+        'RW':  { left: 80, top: 15 },
+        'LCM': { left: 25, top: 42 },
+        'CM':  { left: 50, top: 38 },
+        'RCM': { left: 75, top: 42 },
+        'LB':  { left: 12, top: 70 },
+        'LCB': { left: 37, top: 73 },
+        'RCB': { left: 63, top: 73 },
+        'RB':  { left: 88, top: 70 },
+        'GK':  { left: 50, top: 90 },
+    },
+    '4-4-2': {
+        'LW':  { left: 35, top: 15 },
+        'RW':  { left: 65, top: 15 },
+        'LM':  { left: 12, top: 42 },
+        'LCM': { left: 37, top: 40 },
+        'RCM': { left: 63, top: 40 },
+        'RM':  { left: 88, top: 42 },
+        'LB':  { left: 12, top: 70 },
+        'LCB': { left: 37, top: 73 },
+        'RCB': { left: 63, top: 73 },
+        'RB':  { left: 88, top: 70 },
+        'GK':  { left: 50, top: 90 },
+    },
+    '3-5-2': {
+        'LW':  { left: 35, top: 15 },
+        'ST':  { left: 50, top: 13 },
+        'RW':  { left: 65, top: 15 },
+        'MF0': { left: 25, top: 42 },
+        'MF1': { left: 50, top: 38 },
+        'MF2': { left: 75, top: 42 },
+        'LB':  { left: 12, top: 70 },
+        'LCB': { left: 37, top: 73 },
+        'RCB': { left: 63, top: 73 },
+        'RB':  { left: 88, top: 70 },
+        'GK':  { left: 50, top: 90 },
+    },
+};
+
+// 포지션 → 행 키(row key) 매핑 (라벨 색상용)
+function getPosRowKey(pos, fType) {
+    const fDef = FORMATION_POSITIONS[fType];
+    if (!fDef) return 'mf';
+    for (const row of fDef.rows) {
+        if (row.positions.includes(pos)) return row.key;
+    }
+    return 'mf';
+}
+
 function renderFormationBuilder() {
     const container = document.getElementById('formation-builder');
     if (!container) return;
@@ -220,25 +287,16 @@ function renderFormationBuilder() {
     const fDef = FORMATION_POSITIONS[fType];
     const fMap = AppState.formationState[q];
     const fSubs = AppState.formationSubs[q];
+    const coords = PITCH_POS_COORDS[fType] || {};
 
     // 이미 배정된 선수 목록 (포지션별)
-    const assignedMain = new Set();
-    const assignedSub = new Set();
-    for (const [pos, player] of Object.entries(fMap)) {
-        if (player && player !== '-') assignedMain.add(player);
-        const sub = fSubs[pos];
-        if (sub && sub !== '-') assignedSub.add(sub);
-    }
-
     function buildOptions(pos, type) {
         const current = type === 'main' ? (fMap[pos] || '-') : (fSubs[pos] || '-');
 
-        // 현재 포지션을 제외하고 배치된 선수 집합 계산
-        // → 같은 포지션의 현재 선수는 블록하지 않아야 드롭다운에 표시됨
         const assignedMainOther = new Set();
         const assignedSubOther = new Set();
         for (const [p, player] of Object.entries(fMap)) {
-            if (p === pos) continue; // 현재 포지션 제외
+            if (p === pos) continue;
             if (player && player !== '-') assignedMainOther.add(player);
             const sub = fSubs[p];
             if (sub && sub !== '-') assignedSubOther.add(sub);
@@ -251,52 +309,62 @@ function renderFormationBuilder() {
         const opts = pool.filter(n => {
             if (n === current) return true;
             if (type === 'main') return !assignedMainOther.has(n) && !assignedSubOther.has(n);
-            // 교체 슬롯: 같은 포지션 main에 배치된 선수도 제외
             return !assignedMainOther.has(n) && !assignedSubOther.has(n) && n !== (fMap[pos] || '');
         });
 
         const optionHtml = opts.map(n => {
             const qCnt = participation[n] || 0;
             const role = AppState.roster[n] === 'Guest' ? ' (용병)' : '';
-            const label = type === 'main'
-                ? `${n}${role} (${qCnt % 1 === 0 ? qCnt : qCnt.toFixed(1)}Q)`
-                : `🔄 ${n}${role} (${qCnt % 1 === 0 ? qCnt : qCnt.toFixed(1)}Q)`;
+            const label = `${n}${role} (${qCnt % 1 === 0 ? qCnt : qCnt.toFixed(1)}Q)`;
             return `<option value="${n}" ${n === current ? 'selected' : ''}>${label}</option>`;
         }).join('');
 
-        const noneLabel = type === 'main' ? '- 없음 -' : '🔄 교체없음';
+        const noneLabel = type === 'main' ? pos : '🔄 교체없음';
         return `<option value="-" ${current === '-' ? 'selected' : ''}>${noneLabel}</option>${optionHtml}`;
     }
 
     function buildPosCell(pos) {
         const label = (POSITION_DISPLAY_LABELS[fType] || {})[pos] || pos;
+        const coord = coords[pos] || { left: 50, top: 50 };
+        const rowKey = getPosRowKey(pos, fType);
+        const hasSub = fSubs[pos] && fSubs[pos] !== '-';
+        const subCheckId = `sub-check-${q}-${pos}`;
         return `
-      <div class="pos-cell" data-pos="${pos}">
-        <div class="pos-label">${label}</div>
+      <div class="pos-cell" data-pos="${pos}" style="left:${coord.left}%;top:${coord.top}%">
+        <div class="pos-label pos-label-${rowKey}">${label}</div>
         <select class="pos-main-sel" data-pos="${pos}">${buildOptions(pos, 'main')}</select>
-        <select class="pos-sub-sel" data-pos="${pos}">${buildOptions(pos, 'sub')}</select>
+        <div class="pos-sub-row">
+          <input type="checkbox" id="${subCheckId}" class="sub-toggle" data-pos="${pos}" ${hasSub ? 'checked' : ''}>
+          <label for="${subCheckId}">교체있음</label>
+        </div>
+        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${pos}">${buildOptions(pos, 'sub')}</select>
       </div>`;
     }
 
-    const rowsHtml = fDef.rows.map(row => `
-    <div class="formation-row row-${row.key}">
-      ${row.positions.map(pos => buildPosCell(pos)).join('')}
-    </div>`).join('');
+    // 피치 라인 + 포지션 카드 렌더링
+    const allPositions = fDef.rows.flatMap(row => row.positions);
+    const positionsHtml = allPositions.map(pos => buildPosCell(pos)).join('');
 
-    container.innerHTML = rowsHtml;
+    container.innerHTML = `
+    <div class="pitch-title">FC BARZA  ${q}  (${fType})</div>
+    <div class="pitch-lines"></div>
+    <div class="pitch-center-circle"></div>
+    <div class="pitch-penalty-top"></div>
+    <div class="pitch-penalty-bottom"></div>
+    ${positionsHtml}`;
 
     // 특정 쿼터에서 선수가 포메이션에 배정되어 있는지 확인하는 헬퍼
     function isPlayerInFormation(playerName, quarter) {
-        const fMap = AppState.formationState[quarter];
-        const fSubs = AppState.formationSubs[quarter];
-        for (const pos in fMap) {
-            if (fMap[pos] === playerName && fMap[pos] !== '-') return true;
-            if (fSubs[pos] === playerName && fSubs[pos] !== '-') return true;
+        const fm = AppState.formationState[quarter];
+        const fs = AppState.formationSubs[quarter];
+        for (const p in fm) {
+            if (fm[p] === playerName && fm[p] !== '-') return true;
+            if (fs[p] === playerName && fs[p] !== '-') return true;
         }
         return false;
     }
 
-    // 이벤트 핸들러
+    // 이벤트 핸들러 — 선수 선택
     container.querySelectorAll('.pos-main-sel').forEach(sel => {
         sel.addEventListener('change', () => {
             const pos = sel.dataset.pos;
@@ -304,12 +372,10 @@ function renderFormationBuilder() {
             const val = sel.value;
             AppState.formationState[q][pos] = val;
 
-            // 새로 배정된 선수 squadPlan 자동 체크
             if (val !== '-') {
                 if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
                 AppState.squadPlan[val][q] = true;
             }
-            // 교체된 이전 선수가 해당 쿼터에 더 이상 없으면 squadPlan 해제
             if (oldVal && oldVal !== '-' && oldVal !== val) {
                 if (!isPlayerInFormation(oldVal, q)) {
                     if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
@@ -319,11 +385,11 @@ function renderFormationBuilder() {
             renderFormationBuilder();
             renderSquadTable();
             renderPlaytimeStats();
-            updateFormationPreview();
             renderFormationOverview();
         });
     });
 
+    // 이벤트 핸들러 — 교체 드롭다운
     container.querySelectorAll('.pos-sub-sel').forEach(sel => {
         sel.addEventListener('change', () => {
             const pos = sel.dataset.pos;
@@ -331,12 +397,10 @@ function renderFormationBuilder() {
             const val = sel.value;
             AppState.formationSubs[q][pos] = val;
 
-            // 새로 배정된 교체 선수 squadPlan 자동 체크
             if (val !== '-') {
                 if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
                 AppState.squadPlan[val][q] = true;
             }
-            // 교체된 이전 교체 선수가 해당 쿼터에 더 이상 없으면 squadPlan 해제
             if (oldVal && oldVal !== '-' && oldVal !== val) {
                 if (!isPlayerInFormation(oldVal, q)) {
                     if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
@@ -346,8 +410,32 @@ function renderFormationBuilder() {
             renderFormationBuilder();
             renderSquadTable();
             renderPlaytimeStats();
-            updateFormationPreview();
             renderFormationOverview();
+        });
+    });
+
+    // 이벤트 핸들러 — 교체 체크박스 토글
+    container.querySelectorAll('.sub-toggle').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const pos = cb.dataset.pos;
+            const subSel = container.querySelector(`.pos-sub-sel[data-pos="${pos}"]`);
+            if (cb.checked) {
+                subSel.classList.add('show');
+            } else {
+                subSel.classList.remove('show');
+                // 체크 해제 시 교체 선수 초기화
+                const oldVal = AppState.formationSubs[q][pos];
+                AppState.formationSubs[q][pos] = '-';
+                if (oldVal && oldVal !== '-') {
+                    if (!isPlayerInFormation(oldVal, q)) {
+                        if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
+                    }
+                }
+                renderFormationBuilder();
+                renderSquadTable();
+                renderPlaytimeStats();
+                renderFormationOverview();
+            }
         });
     });
 }
@@ -487,7 +575,6 @@ function initTab1Events() {
         // 포메이션 타입 셀렉트 동기화
         document.getElementById('formation-type-select').value = AppState.formationTypes[AppState.currentQuarter];
         renderFormationBuilder();
-        updateFormationPreview();
     });
 
     // 포메이션 타입 변경
@@ -499,7 +586,6 @@ function initTab1Events() {
         AppState.formationState[q] = {};
         AppState.formationSubs[q] = {};
         renderFormationBuilder();
-        updateFormationPreview();
     });
 
     // 포메이션 이미지 다운로드

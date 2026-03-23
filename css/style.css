@@ -536,11 +536,25 @@ input[type="checkbox"] {
   border: 1px solid rgba(82, 183, 136, 0.25);
 }
 
-/* --- 포메이션 빌더 --- */
+/* --- 포메이션 빌더 헤더 --- */
+.formation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.formation-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 #quarter-selector {
   display: flex;
-  gap: 0.4rem;
-  margin-bottom: 0.6rem;
+  gap: 0.3rem;
 }
 
 .qbtn {
@@ -548,8 +562,8 @@ input[type="checkbox"] {
   border: 1px solid var(--border);
   color: var(--text-muted);
   border-radius: var(--radius-sm);
-  padding: 0.35rem 0.9rem;
-  font-size: 0.88rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -569,86 +583,299 @@ input[type="checkbox"] {
 .formation-type-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  gap: 0.5rem;
 }
 
 .formation-type-row label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
 .formation-type-row select {
-  max-width: 160px;
-}
-
-#formation-builder {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  overflow-x: auto;
-  /* 매우 좁은 화면에서 가로 스크롤 → 행 구조 유지 */
-}
-
-.formation-row {
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  flex-wrap: nowrap;
-  /* 줄바꿈 금지 → 포메이션 행 유지 */
-  align-items: stretch;
-}
-
-.pos-cell {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.35rem 0.4rem;
-  min-width: 90px;
   max-width: 140px;
-  flex: 1 1 90px;
-  /* 비율로 늘어나되 최소 너비 보장 */
+}
+
+/* --- 피치 기반 포메이션 빌더 --- */
+#formation-builder {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 68 / 105;
+  background: linear-gradient(180deg,
+      #1e5631 0%, #2d6a4f 15%, #236b3e 30%,
+      #2d6a4f 45%, #236b3e 60%, #2d6a4f 75%,
+      #236b3e 90%, #1e5631 100%);
+  border-radius: var(--radius);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+/* 피치 타이틀바 */
+.pitch-title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f0ecec;
+  letter-spacing: 0.05em;
+  z-index: 10;
+}
+
+/* 피치 라인 - 외곽 */
+.pitch-lines {
+  position: absolute;
+  top: 32px;
+  left: 3%;
+  right: 3%;
+  bottom: 3%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 센터 라인 */
+.pitch-lines::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 0;
+  border-top: 2px solid rgba(255, 255, 255, 0.55);
+}
+
+/* 센터 서클 */
+.pitch-center-circle {
+  position: absolute;
+  top: calc(32px + (100% - 32px - 3%) * 0.5 - 12%);
+  left: 50%;
+  width: 24%;
+  aspect-ratio: 1;
+  transform: translate(-50%, 0);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 센터 점 */
+.pitch-center-circle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* 상단 페널티 박스 */
+.pitch-penalty-top {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44%;
+  height: 16%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-top: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 상단 골 에어리어 */
+.pitch-penalty-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 45%;
+  height: 45%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-top: none;
+}
+
+/* 하단 페널티 박스 */
+.pitch-penalty-bottom {
+  position: absolute;
+  bottom: 3%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44%;
+  height: 16%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-bottom: none;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 하단 골 에어리어 */
+.pitch-penalty-bottom::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 45%;
+  height: 45%;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-bottom: none;
+}
+
+/* --- 포지션 카드 --- */
+.pos-cell {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: rgba(13, 17, 23, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.25rem 0.35rem 0.35rem;
+  min-width: 100px;
   text-align: center;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+  transition: border-color var(--transition);
+}
+
+.pos-cell:hover {
+  border-color: rgba(255, 255, 255, 0.35);
 }
 
 .pos-label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: var(--burgundy-light);
   text-transform: uppercase;
-  margin-bottom: 0.3rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.2rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* 포지션별 라벨 색상 */
+.pos-label-fw {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.15);
+}
+
+.pos-label-am {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
+}
+
+.pos-label-mf {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+}
+
+.pos-label-dm {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.pos-label-df {
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.15);
+}
+
+.pos-label-gk {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
 }
 
 .pos-cell select {
   width: 100%;
-  font-size: 0.74rem;
-  padding: 0.25rem 0.3rem;
-  margin-bottom: 0.2rem;
-}
-
-.pos-cell select:last-child {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.25rem;
   margin-bottom: 0;
+  background: rgba(22, 22, 22, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  border-radius: 4px;
 }
 
-/* 포메이션 미리보기 */
-.formation-preview-wrapper {
-  margin-top: 0.75rem;
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--border);
+.pos-cell select:focus {
+  border-color: var(--burgundy-light);
+  box-shadow: 0 0 0 1px var(--burgundy-dim);
 }
 
-#formation-preview-canvas {
-  width: 100%;
+/* 교체 체크박스 행 */
+.pos-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.pos-sub-row input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+}
+
+.pos-sub-row label {
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.pos-sub-sel {
+  display: none;
+  margin-top: 0.2rem;
+}
+
+.pos-sub-sel.show {
   display: block;
 }
 
+/* 다운로드 버튼 */
 .export-formation-row {
   margin-top: 0.75rem;
   display: flex;
   justify-content: center;
+}
+
+/* 반응형 — 좁은 화면 */
+@media (max-width: 600px) {
+  #formation-builder {
+    aspect-ratio: 68 / 110;
+  }
+
+  .pos-cell {
+    min-width: 75px;
+    padding: 0.2rem 0.25rem 0.3rem;
+  }
+
+  .pos-cell select {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.2rem;
+  }
+
+  .pos-label {
+    font-size: 0.62rem;
+  }
+
+  .pos-sub-row {
+    font-size: 0.6rem;
+  }
+
+  .pitch-title {
+    font-size: 0.72rem;
+    height: 26px;
+  }
 }
 
 /* --- 스코어 입력 --- */
