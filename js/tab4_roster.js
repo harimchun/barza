@@ -58,6 +58,12 @@ function renderRosterTab() {
           <tbody>${buildRows(guests, true)}</tbody>
         </table>
       </div>
+    </div>
+
+    <div class="roster-section" style="margin-top:1rem">
+      <h3>⚙️ 편집 설정</h3>
+      <p class="hint-text">편집 암호를 아는 사람만 경기·명단을 수정할 수 있습니다. 정한 암호를 팀원에게 공유하세요.</p>
+      <button class="btn-secondary editor-only" data-action="change-passcode">🔑 편집 암호 변경</button>
     </div>`;
 
   // 이벤트 위임 (인라인 onclick 대신 — 이름의 특수문자 안전)
@@ -70,6 +76,7 @@ function renderRosterTab() {
     else if (action === 'promote') promotePlayer(name);
     else if (action === 'demote') demotePlayer(name);
     else if (action === 'delete') deletePlayer(name);
+    else if (action === 'change-passcode') openChangePasscodeModal();
   };
 
   // Enter key for new player

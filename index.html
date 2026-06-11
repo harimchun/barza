@@ -15,10 +15,6 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
   <link rel="stylesheet" href="css/style.css">
 
-  <!-- Firebase SDK (Google 로그인용) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
 </head>
 
 <body>
@@ -223,6 +219,20 @@
 
   <!-- Toast 컨테이너 -->
   <div id="toast-container"></div>
+
+  <!-- 편집 암호 모달 -->
+  <div id="passcode-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <h3 id="passcode-modal-title">편집 잠금 해제</h3>
+      <p id="passcode-modal-desc" class="hint-text"></p>
+      <input type="password" id="passcode-input" inputmode="text" autocomplete="off"
+        placeholder="편집 암호" aria-label="편집 암호">
+      <div class="modal-actions">
+        <button id="passcode-cancel" class="btn-cancel">취소</button>
+        <button id="passcode-confirm" class="btn-primary">확인</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ========== SCRIPTS ========== -->
   <script src="js/config.js"></script>

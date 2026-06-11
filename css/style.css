@@ -433,6 +433,57 @@ input[type="number"]::-webkit-inner-spin-button {
   box-shadow: none !important;
 }
 
+/* --- 모달 (편집 암호 입력) --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.modal-box h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.modal-box .hint-text {
+  margin-bottom: 0.9rem;
+  line-height: 1.5;
+}
+
+.modal-box input {
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.modal-actions button {
+  padding: 0.5rem 1.1rem;
+}
+
 /* ============================================
    Tab 1 - 당일 경기 운영
    ============================================ */

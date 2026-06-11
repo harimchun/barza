@@ -62,11 +62,10 @@ const POS_COORDS = {
 
 // 앱 전역 상태
 const AppState = {
-    // Auth
-    accessToken: null,
+    // 편집 권한 (공유 암호 기반)
     isSignedIn: false,
-    currentUser: null,   // Firebase Auth user object
-    isEditor: false,     // true if user email is in CONFIG.ALLOWED_EDITORS
+    isEditor: false,            // true면 편집 모드 (암호로 잠금 해제됨)
+    editPasscodeHash: null,     // DB에 저장된 편집 암호 해시 (없으면 null = 미설정)
 
     // Drive 파일 ID 캐시
     rosterFileId: null,
@@ -252,8 +251,8 @@ async function initApp() {
         document.getElementById('match-date').value = today();
     }
 
-    // Firebase 초기화
-    await initGoogleAuth();
+    // 백엔드(데이터 + 편집 암호) 초기화
+    await initBackend();
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
