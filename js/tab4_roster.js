@@ -10,28 +10,36 @@ function renderRosterTab() {
   const members = Object.entries(roster).filter(([, r]) => r === 'Member').sort((a, b) => a[0].localeCompare(b[0], 'ko'));
   const guests = Object.entries(roster).filter(([, r]) => r === 'Guest').sort((a, b) => a[0].localeCompare(b[0], 'ko'));
 
-  const buildRows = (entries, isGuest) => entries.map(([name, role]) => `
+  const buildRows = (entries, isGuest) => {
+    if (entries.length === 0) {
+      return `<tr><td colspan="3" class="empty-hint" style="text-align:center;padding:1rem">아직 없습니다.</td></tr>`;
+    }
+    return entries.map(([name]) => {
+      const safe = escapeHtml(name);
+      return `
     <tr>
-      <td class="roster-name">${name}</td>
+      <td class="roster-name">${safe}</td>
       <td><span class="role-badge ${isGuest ? 'guest' : 'member'}">${isGuest ? '용병' : '멤버'}</span></td>
       <td class="roster-actions">
         ${isGuest
-      ? `<button class="btn-sm btn-promote" onclick="promotePlayer('${name}')">멤버로 승격</button>`
-      : `<button class="btn-sm btn-demote" onclick="demotePlayer('${name}')">용병으로 변경</button>`}
-        <button class="btn-sm btn-delete-player" onclick="deletePlayer('${name}')">🗑️</button>
+        ? `<button class="btn-sm btn-promote editor-only" data-action="promote" data-name="${safe}">멤버로 승격</button>`
+        : `<button class="btn-sm btn-demote editor-only" data-action="demote" data-name="${safe}">용병으로 변경</button>`}
+        <button class="btn-sm btn-delete-player editor-only" data-action="delete" data-name="${safe}" title="삭제">🗑️</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
+  };
 
   container.innerHTML = `
     <div class="roster-add-card">
       <h3>➕ 선수 / 용병 등록</h3>
       <div class="roster-add-form">
-        <input type="text" id="new-player-name" placeholder="이름 입력">
-        <select id="new-player-role">
+        <input type="text" id="new-player-name" class="editor-only" placeholder="이름 입력">
+        <select id="new-player-role" class="editor-only">
           <option value="Member">멤버</option>
           <option value="Guest">용병</option>
         </select>
-        <button class="btn-primary" onclick="addPlayer()">등록하기</button>
+        <button class="btn-primary editor-only" data-action="add">등록하기</button>
       </div>
     </div>
 
@@ -44,7 +52,7 @@ function renderRosterTab() {
         </table>
       </div>
       <div class="roster-section">
-        <h3>用 용병 <span class="count-badge guest">${guests.length}</span></h3>
+        <h3>🤝 용병 <span class="count-badge guest">${guests.length}</span></h3>
         <table class="roster-table">
           <thead><tr><th>이름</th><th>구분</th><th>관리</th></tr></thead>
           <tbody>${buildRows(guests, true)}</tbody>
@@ -52,10 +60,25 @@ function renderRosterTab() {
       </div>
     </div>`;
 
+  // 이벤트 위임 (인라인 onclick 대신 — 이름의 특수문자 안전)
+  container.onclick = e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const name = btn.dataset.name;
+    if (action === 'add') addPlayer();
+    else if (action === 'promote') promotePlayer(name);
+    else if (action === 'demote') demotePlayer(name);
+    else if (action === 'delete') deletePlayer(name);
+  };
+
   // Enter key for new player
   document.getElementById('new-player-name').addEventListener('keydown', e => {
     if (e.key === 'Enter') addPlayer();
   });
+
+  // 새로 그려진 버튼/입력에 권한 상태 반영
+  if (typeof updateEditButtonsVisibility === 'function') updateEditButtonsVisibility();
 }
 
 async function addPlayer() {

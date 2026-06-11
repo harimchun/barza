@@ -77,7 +77,7 @@ const AppState = {
     matches: [],   // 경기 기록 배열
 
     // Tab 1 - 현재 경기 편집 상태
-    matchDate: new Date().toISOString().slice(0, 10),
+    matchDate: today(),
     matchLocation: '잠실유수지',
     matchOpponent: '상대팀',
     attendees: [],   // string[]
@@ -89,6 +89,7 @@ const AppState = {
     matchStats: {},  // { name: { goals: 0, assists: 0 } }
     matchEvents: [], // [{ quarter, type:'goal'|'opponentGoal', scorer, assister }]
     liveQuarter: '1Q',
+    editingEventIdx: null, // 실시간 기록에서 인라인 수정 중인 이벤트 인덱스
     editModeId: null,
     currentQuarter: '1Q',
 
@@ -103,7 +104,20 @@ const AppState = {
 
 // 유틸 함수
 function today() {
-    return new Date().toISOString().slice(0, 10);
+    // 로컬 타임존 기준 YYYY-MM-DD (UTC 변환으로 인한 날짜 어긋남 방지)
+    const d = new Date();
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 10);
+}
+
+// HTML 삽입 시 사용자 입력(이름/장소/상대팀 등)을 안전하게 이스케이프
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function formatPlayerName(name) {
@@ -149,6 +163,7 @@ function resetMatchState() {
     AppState.matchStats = {};
     AppState.matchEvents = [];
     AppState.liveQuarter = '1Q';
+    AppState.editingEventIdx = null;
     AppState.editModeId = null;
     AppState.currentQuarter = '1Q';
     AppState.dupConfirmId = null;

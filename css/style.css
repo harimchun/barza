@@ -43,8 +43,13 @@ html {
 body {
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   background: var(--bg);
+  background-image: radial-gradient(1100px 380px at 50% -120px, rgba(140, 28, 43, 0.14), transparent 70%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* --- 헤더 --- */
@@ -65,10 +70,13 @@ body {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .header-logo .badge {
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 .header-logo .name {
@@ -76,12 +84,23 @@ body {
   font-weight: 700;
   color: var(--text);
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.auth-btn {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #auth-status {
@@ -394,6 +413,26 @@ input[type="number"]::-webkit-inner-spin-button {
   margin-bottom: 1rem;
 }
 
+/* --- 읽기 전용 안내 배너 --- */
+.role-notice-banner {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.32);
+  color: #93c5fd;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.9rem;
+  font-size: 0.84rem;
+  margin-bottom: 1rem;
+}
+
+/* --- 편집 권한 없을 때 비활성 컨트롤 --- */
+.editor-only:disabled,
+.editor-only[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 /* ============================================
    Tab 1 - 당일 경기 운영
    ============================================ */
@@ -600,9 +639,9 @@ input[type="checkbox"] {
 #formation-builder {
   position: relative;
   width: 100%;
-  max-width: 560px;
-  aspect-ratio: 68 / 85;
-  max-height: 600px;
+  max-width: 540px;
+  aspect-ratio: 68 / 88;
+  max-height: 720px;
   margin: 0 auto;
   background: linear-gradient(180deg,
       #1e5631 0%, #2d6a4f 15%, #236b3e 30%,
@@ -735,113 +774,127 @@ input[type="checkbox"] {
   border-bottom: none;
 }
 
-/* --- 포지션 카드 --- */
+/* --- 포지션 카드 (피치 위 비주얼 배치) --- */
 .pos-cell {
   position: absolute;
   transform: translate(-50%, -50%);
-  background: rgba(13, 17, 23, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
-  padding: 0.25rem 0.35rem 0.35rem;
-  min-width: 100px;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18rem;
+  padding: 0.3rem 0.32rem;
+  background: rgba(13, 17, 23, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
   text-align: center;
   z-index: 5;
-  backdrop-filter: blur(4px);
-  transition: border-color var(--transition);
+  backdrop-filter: blur(5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
 }
 
+.pos-cell.is-filled {
+  background: rgba(13, 17, 23, 0.86);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* 편집 중(포커스)·호버 카드를 위로 띄워 겹쳐도 조작 가능 */
 .pos-cell:hover {
-  border-color: rgba(255, 255, 255, 0.35);
+  z-index: 30;
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
-.pos-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 0.2rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 3px;
-  display: inline-block;
+.pos-cell:focus-within {
+  z-index: 40;
+  border-color: var(--burgundy-light);
+  box-shadow: 0 0 0 2px var(--burgundy-dim), 0 6px 16px rgba(0, 0, 0, 0.5);
 }
 
-/* 포지션별 라벨 색상 */
-.pos-label-fw {
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.15);
+/* 포지션 배지 */
+.pos-badge {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
-.pos-label-am {
-  color: #f97316;
-  background: rgba(249, 115, 22, 0.15);
-}
+.pos-badge-fw { color: #fbbf24; background: rgba(251, 191, 36, 0.16); }
+.pos-badge-am { color: #fb923c; background: rgba(249, 115, 22, 0.16); }
+.pos-badge-mf { color: #4ade80; background: rgba(74, 222, 128, 0.16); }
+.pos-badge-dm { color: #38bdf8; background: rgba(56, 189, 248, 0.16); }
+.pos-badge-df { color: #60a5fa; background: rgba(96, 165, 250, 0.16); }
+.pos-badge-gk { color: #f87171; background: rgba(248, 113, 113, 0.16); }
 
-.pos-label-mf {
-  color: #4ade80;
-  background: rgba(74, 222, 128, 0.15);
-}
-
-.pos-label-dm {
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.15);
-}
-
-.pos-label-df {
-  color: #60a5fa;
-  background: rgba(96, 165, 250, 0.15);
-}
-
-.pos-label-gk {
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.15);
-}
-
+/* 카드 내 셀렉트 */
 .pos-cell select {
   width: 100%;
   font-size: 0.72rem;
-  padding: 0.2rem 0.25rem;
-  margin-bottom: 0;
-  background: rgba(22, 22, 22, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.22rem 0.3rem;
+  margin: 0;
+  background: rgba(22, 22, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--text);
-  border-radius: 4px;
+  border-radius: 5px;
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
 
 .pos-cell select:focus {
   border-color: var(--burgundy-light);
   box-shadow: 0 0 0 1px var(--burgundy-dim);
+  outline: none;
 }
 
-/* 교체 체크박스 행 */
-.pos-sub-row {
+.pos-main-sel { font-weight: 600; }
+
+/* 교체 토글 버튼 (카드 우상단, 카드 안쪽 — 피치 경계 잘림 방지) */
+.pos-sub-toggle {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  font-size: 0.72rem;
+  line-height: 1;
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.2rem;
-  font-size: 0.68rem;
+  justify-content: center;
+  background: var(--surface-2);
   color: var(--text-muted);
-}
-
-.pos-sub-row input[type="checkbox"] {
-  width: 12px;
-  height: 12px;
-  margin: 0;
-}
-
-.pos-sub-row label {
+  border: 1px solid var(--border);
+  border-radius: 50%;
   cursor: pointer;
-  user-select: none;
-  font-size: 0.68rem;
-  color: var(--text-muted);
+  z-index: 2;
+  transition: var(--transition);
 }
 
+.pos-sub-toggle:hover {
+  color: var(--text);
+  border-color: var(--burgundy-light);
+}
+
+.pos-sub-toggle.active {
+  background: var(--burgundy);
+  color: #fff;
+  border-color: var(--burgundy);
+}
+
+/* 교체 셀렉트 */
 .pos-sub-sel {
   display: none;
-  margin-top: 0.2rem;
 }
 
 .pos-sub-sel.show {
   display: block;
+}
+
+.pos-cell.has-sub .pos-sub-sel {
+  border-color: rgba(240, 180, 41, 0.45);
 }
 
 /* 다운로드 버튼 */
@@ -854,25 +907,30 @@ input[type="checkbox"] {
 /* 반응형 — 좁은 화면 */
 @media (max-width: 600px) {
   #formation-builder {
-    aspect-ratio: 68 / 110;
+    aspect-ratio: 68 / 104;
   }
 
   .pos-cell {
-    min-width: 75px;
-    padding: 0.2rem 0.25rem 0.3rem;
+    width: 74px;
+    padding: 0.24rem;
+    gap: 0.12rem;
   }
 
   .pos-cell select {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.2rem;
-  }
-
-  .pos-label {
     font-size: 0.62rem;
+    padding: 0.18rem 0.2rem;
   }
 
-  .pos-sub-row {
-    font-size: 0.6rem;
+  .pos-badge {
+    font-size: 0.58rem;
+    padding: 0.06rem 0.3rem;
+  }
+
+  .pos-sub-toggle {
+    width: 17px;
+    height: 17px;
+    top: 2px;
+    right: 2px;
   }
 
   .pitch-title {
@@ -1067,6 +1125,105 @@ input[type="checkbox"] {
 .event-delete:hover {
   background: rgba(239, 68, 68, 0.2);
   color: #f87171;
+}
+
+/* 이벤트 액션 (수정/삭제) */
+.event-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.event-edit {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0.15rem 0.32rem;
+  border-radius: 3px;
+  transition: var(--transition);
+}
+
+.event-edit:hover {
+  background: var(--burgundy-dim);
+  color: var(--burgundy-light);
+}
+
+/* 인라인 수정 폼 */
+.event-edit-form {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  background: var(--surface);
+  border: 1px solid var(--burgundy);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem;
+  margin: 0.2rem 0;
+}
+
+.ev-edit-fields {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.ev-edit-fields select {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.82rem;
+  padding: 0.32rem 0.4rem;
+}
+
+.ev-edit-quarter {
+  flex: 0 0 auto !important;
+  max-width: 66px;
+}
+
+.ev-edit-label {
+  flex: 1;
+  color: #f87171;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.ev-edit-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.ev-edit-save {
+  background: var(--burgundy);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.34rem 0.95rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.ev-edit-save:hover {
+  background: var(--burgundy-light);
+}
+
+.ev-edit-cancel {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.34rem 0.95rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.ev-edit-cancel:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
 }
 
 .num-cell {
@@ -1696,6 +1853,27 @@ input[type="checkbox"] {
 
   .app-header {
     padding: 0 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .header-logo .name {
+    font-size: 0.98rem;
+    letter-spacing: 0;
+  }
+
+  .header-logo .badge {
+    font-size: 1.3rem;
+  }
+
+  /* 좁은 화면에서는 텍스트 상태 대신 버튼만 표시 */
+  #auth-status {
+    display: none;
+  }
+
+  .auth-btn {
+    max-width: 150px;
+    padding: 0.38rem 0.7rem;
+    font-size: 0.8rem;
   }
 
   .tab-nav {
@@ -1705,13 +1883,5 @@ input[type="checkbox"] {
   .tab-btn {
     font-size: 0.82rem;
     padding: 0.4rem 0.6rem;
-  }
-
-  .formation-row {
-    gap: 0.3rem;
-  }
-
-  .pos-cell {
-    min-width: 90px;
   }
 }

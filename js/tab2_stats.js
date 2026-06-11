@@ -114,7 +114,7 @@ function buildLeaderboardTable(players, columns) {
     if (players.length === 0) return '<p class="empty-hint">데이터 없음</p>';
     const headers = ['순위', '이름', ...columns.map(c => c.label)].map(h => `<th>${h}</th>`).join('');
     const rows = players.map((p, i) => {
-        const cells = [`<td class="rank-cell">${i + 1}</td>`, `<td class="name-cell">${p.name}</td>`,
+        const cells = [`<td class="rank-cell">${i + 1}</td>`, `<td class="name-cell">${escapeHtml(p.name)}</td>`,
         ...columns.map(c => `<td class="num-cell">${p[c.key]}</td>`)].join('');
         return `<tr class="${i < 3 ? 'top-' + (i + 1) : ''}">${cells}</tr>`;
     }).join('');

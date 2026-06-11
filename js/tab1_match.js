@@ -115,10 +115,11 @@ function renderPlayerChecklist() {
     container.innerHTML = players.map(name => {
         const checked = AppState.attendees.includes(name) ? 'checked' : '';
         const isGuest = AppState.roster[name] === 'Guest';
+        const safe = escapeHtml(name);
         return `
       <label class="player-check-item ${isGuest ? 'is-guest' : ''}">
-        <input type="checkbox" class="player-cb" data-name="${name}" ${checked}>
-        <span>${name}${isGuest ? ' <em>(용병)</em>' : ''}</span>
+        <input type="checkbox" class="player-cb" data-name="${safe}" ${checked}>
+        <span>${safe}${isGuest ? ' <em>(용병)</em>' : ''}</span>
       </label>`;
     }).join('');
 
@@ -148,13 +149,14 @@ function renderSquadTable() {
     }
     const rows = AppState.attendees.map(name => {
         const sp = AppState.squadPlan[name] || { '1Q': false, '2Q': false, '3Q': false, '4Q': false };
+        const safe = escapeHtml(name);
         const qCells = QUARTERS.map(q => {
             const checked = sp[q] ? 'checked' : '';
-            return `<td><input type="checkbox" class="squad-cb" data-name="${name}" data-q="${q}" ${checked}></td>`;
+            return `<td><input type="checkbox" class="squad-cb" data-name="${safe}" data-q="${q}" ${checked}></td>`;
         }).join('');
         const participation = getParticipation(name);
         return `<tr>
-      <td class="squad-name">${formatPlayerName(name)}</td>
+      <td class="squad-name">${escapeHtml(formatPlayerName(name))}</td>
       ${qCells}
       <td class="participation-score">${participation % 1 === 0 ? participation : participation.toFixed(1)}</td>
     </tr>`;
@@ -285,11 +287,22 @@ function renderFormationBuilder() {
     const q = AppState.currentQuarter;
     const fType = AppState.formationTypes[q];
     const fDef = FORMATION_POSITIONS[fType];
-    const fMap = AppState.formationState[q];
-    const fSubs = AppState.formationSubs[q];
     const coords = PITCH_POS_COORDS[fType] || {};
 
-    // 이미 배정된 선수 목록 (포지션별)
+    // 알 수 없는 포메이션 타입 방어 (데이터 손상/구버전 기록 대비)
+    if (!fDef) {
+        container.innerHTML = `
+      <div class="pitch-title">FC BARZA · ${escapeHtml(q)}</div>
+      <p class="empty-hint" style="position:absolute;inset:32px 0 0;display:flex;align-items:center;justify-content:center;text-align:center;padding:1rem">
+        지원하지 않는 포메이션입니다: ${escapeHtml(fType || '?')}
+      </p>`;
+        return;
+    }
+
+    const fMap = AppState.formationState[q];
+    const fSubs = AppState.formationSubs[q];
+
+    // 포지션별 선택 가능한 선수 옵션 (이미 다른 포지션/교체에 배정된 선수는 제외)
     function buildOptions(pos, type) {
         const current = type === 'main' ? (fMap[pos] || '-') : (fSubs[pos] || '-');
 
@@ -303,23 +316,19 @@ function renderFormationBuilder() {
         }
 
         const pool = AppState.attendees;
-        const participation = {};
-        pool.forEach(n => participation[n] = getParticipation(n));
-
         const opts = pool.filter(n => {
             if (n === current) return true;
             if (type === 'main') return !assignedMainOther.has(n) && !assignedSubOther.has(n);
             return !assignedMainOther.has(n) && !assignedSubOther.has(n) && n !== (fMap[pos] || '');
         });
 
+        // 라벨은 이름(+용병)만 — 좁은 셀에서도 읽기 쉽게 (출전수는 좌측 표/통계에서 확인)
         const optionHtml = opts.map(n => {
-            const qCnt = participation[n] || 0;
             const role = AppState.roster[n] === 'Guest' ? ' (용병)' : '';
-            const label = `${n}${role} (${qCnt % 1 === 0 ? qCnt : qCnt.toFixed(1)}Q)`;
-            return `<option value="${n}" ${n === current ? 'selected' : ''}>${label}</option>`;
+            return `<option value="${escapeHtml(n)}" ${n === current ? 'selected' : ''}>${escapeHtml(n)}${role}</option>`;
         }).join('');
 
-        const noneLabel = type === 'main' ? pos : '🔄 교체없음';
+        const noneLabel = type === 'main' ? '선택' : '교체 없음';
         return `<option value="-" ${current === '-' ? 'selected' : ''}>${noneLabel}</option>${optionHtml}`;
     }
 
@@ -328,16 +337,13 @@ function renderFormationBuilder() {
         const coord = coords[pos] || { left: 50, top: 50 };
         const rowKey = getPosRowKey(pos, fType);
         const hasSub = fSubs[pos] && fSubs[pos] !== '-';
-        const subCheckId = `sub-check-${q}-${pos}`;
+        const filled = fMap[pos] && fMap[pos] !== '-';
         return `
-      <div class="pos-cell" data-pos="${pos}" style="left:${coord.left}%;top:${coord.top}%">
-        <div class="pos-label pos-label-${rowKey}">${label}</div>
-        <select class="pos-main-sel" data-pos="${pos}">${buildOptions(pos, 'main')}</select>
-        <div class="pos-sub-row">
-          <input type="checkbox" id="${subCheckId}" class="sub-toggle" data-pos="${pos}" ${hasSub ? 'checked' : ''}>
-          <label for="${subCheckId}">교체있음</label>
-        </div>
-        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${pos}">${buildOptions(pos, 'sub')}</select>
+      <div class="pos-cell ${filled ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
+        <button type="button" class="pos-sub-toggle ${hasSub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정/해제" aria-label="교체 선수 지정">⇄</button>
+        <div class="pos-badge pos-badge-${rowKey}">${escapeHtml(label)}</div>
+        <select class="pos-main-sel" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수">${buildOptions(pos, 'main')}</select>
+        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildOptions(pos, 'sub')}</select>
       </div>`;
     }
 
@@ -346,7 +352,7 @@ function renderFormationBuilder() {
     const positionsHtml = allPositions.map(pos => buildPosCell(pos)).join('');
 
     container.innerHTML = `
-    <div class="pitch-title">FC BARZA  ${q}  (${fType})</div>
+    <div class="pitch-title">FC BARZA · ${escapeHtml(q)} · ${escapeHtml(fType)}</div>
     <div class="pitch-lines"></div>
     <div class="pitch-center-circle"></div>
     <div class="pitch-penalty-top"></div>
@@ -364,77 +370,47 @@ function renderFormationBuilder() {
         return false;
     }
 
+    // 배정 변경 시 squadPlan 동기화 + 재렌더링 공통 처리
+    function applyAssignment(target, pos, val) {
+        const oldVal = target[pos];
+        target[pos] = val;
+        if (val !== '-') {
+            if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
+            AppState.squadPlan[val][q] = true;
+        }
+        if (oldVal && oldVal !== '-' && oldVal !== val && !isPlayerInFormation(oldVal, q)) {
+            if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
+        }
+        renderFormationBuilder();
+        renderSquadTable();
+        renderPlaytimeStats();
+        renderFormationOverview();
+    }
+
     // 이벤트 핸들러 — 선수 선택
     container.querySelectorAll('.pos-main-sel').forEach(sel => {
-        sel.addEventListener('change', () => {
-            const pos = sel.dataset.pos;
-            const oldVal = AppState.formationState[q][pos];
-            const val = sel.value;
-            AppState.formationState[q][pos] = val;
-
-            if (val !== '-') {
-                if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
-                AppState.squadPlan[val][q] = true;
-            }
-            if (oldVal && oldVal !== '-' && oldVal !== val) {
-                if (!isPlayerInFormation(oldVal, q)) {
-                    if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
-                }
-            }
-
-            renderFormationBuilder();
-            renderSquadTable();
-            renderPlaytimeStats();
-            renderFormationOverview();
-        });
+        sel.addEventListener('change', () => applyAssignment(AppState.formationState[q], sel.dataset.pos, sel.value));
     });
 
     // 이벤트 핸들러 — 교체 드롭다운
     container.querySelectorAll('.pos-sub-sel').forEach(sel => {
-        sel.addEventListener('change', () => {
-            const pos = sel.dataset.pos;
-            const oldVal = AppState.formationSubs[q][pos];
-            const val = sel.value;
-            AppState.formationSubs[q][pos] = val;
-
-            if (val !== '-') {
-                if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
-                AppState.squadPlan[val][q] = true;
-            }
-            if (oldVal && oldVal !== '-' && oldVal !== val) {
-                if (!isPlayerInFormation(oldVal, q)) {
-                    if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
-                }
-            }
-
-            renderFormationBuilder();
-            renderSquadTable();
-            renderPlaytimeStats();
-            renderFormationOverview();
-        });
+        sel.addEventListener('change', () => applyAssignment(AppState.formationSubs[q], sel.dataset.pos, sel.value));
     });
 
-    // 이벤트 핸들러 — 교체 체크박스 토글
-    container.querySelectorAll('.sub-toggle').forEach(cb => {
-        cb.addEventListener('change', () => {
-            const pos = cb.dataset.pos;
-            const subSel = container.querySelector(`.pos-sub-sel[data-pos="${pos}"]`);
-            if (cb.checked) {
-                subSel.classList.add('show');
+    // 이벤트 핸들러 — 교체 토글 버튼 (체크박스 대체, 공간 절약)
+    container.querySelectorAll('.pos-sub-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const pos = btn.dataset.pos;
+            const cell = btn.closest('.pos-cell');
+            const subSel = container.querySelector(`.pos-sub-sel[data-pos="${CSS.escape(pos)}"]`);
+            const turningOn = !btn.classList.contains('active');
+            if (turningOn) {
+                btn.classList.add('active');
+                if (cell) cell.classList.add('has-sub');
+                if (subSel) { subSel.classList.add('show'); subSel.focus(); }
             } else {
-                subSel.classList.remove('show');
-                // 체크 해제 시 교체 선수 초기화
-                const oldVal = AppState.formationSubs[q][pos];
-                AppState.formationSubs[q][pos] = '-';
-                if (oldVal && oldVal !== '-') {
-                    if (!isPlayerInFormation(oldVal, q)) {
-                        if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
-                    }
-                }
-                renderFormationBuilder();
-                renderSquadTable();
-                renderPlaytimeStats();
-                renderFormationOverview();
+                // 끄면 교체 선수 초기화
+                applyAssignment(AppState.formationSubs[q], pos, '-');
             }
         });
     });
@@ -484,8 +460,37 @@ function renderLiveRecorder() {
 
     // 참석자 드롭다운 옵션
     const playerOpts = AppState.attendees.map(n =>
-        `<option value="${n}">${formatPlayerName(n)}</option>`
+        `<option value="${escapeHtml(n)}">${escapeHtml(formatPlayerName(n))}</option>`
     ).join('');
+
+    // 특정 값이 선택된 참석자 옵션 (수정 폼용). 명단에 없는 값도 유지.
+    const playerOptionsWith = (selected) => {
+        const names = (!selected || AppState.attendees.includes(selected))
+            ? AppState.attendees
+            : [selected, ...AppState.attendees];
+        return names.map(n =>
+            `<option value="${escapeHtml(n)}" ${n === selected ? 'selected' : ''}>${escapeHtml(formatPlayerName(n))}</option>`
+        ).join('');
+    };
+    const quarterOptions = (selected) =>
+        QUARTERS.map(qq => `<option value="${qq}" ${qq === selected ? 'selected' : ''}>${qq}</option>`).join('');
+
+    // 인라인 수정 폼 (경기장에서 실시간 기록 중 잘못 입력 수정용)
+    const buildEditForm = (ev, globalIdx) => {
+        const fields = ev.type === 'goal'
+            ? `<select class="ev-edit-quarter" aria-label="쿼터">${quarterOptions(ev.quarter)}</select>
+               <select class="ev-edit-scorer" aria-label="득점자">${playerOptionsWith(ev.scorer)}</select>
+               <select class="ev-edit-assister" aria-label="도움"><option value="">👟 도움 없음</option>${playerOptionsWith(ev.assister)}</select>`
+            : `<select class="ev-edit-quarter" aria-label="쿼터">${quarterOptions(ev.quarter)}</select>
+               <span class="ev-edit-label">🔴 상대팀 득점</span>`;
+        return `<div class="event-item event-edit-form">
+              <div class="ev-edit-fields">${fields}</div>
+              <div class="ev-edit-actions">
+                <button class="ev-edit-save" data-idx="${globalIdx}">저장</button>
+                <button class="ev-edit-cancel">취소</button>
+              </div>
+            </div>`;
+    };
 
     // 쿼터별 이벤트 로그
     const eventsHtml = QUARTERS.map(q => {
@@ -493,18 +498,25 @@ function renderLiveRecorder() {
         const [us, them] = AppState.quarterScores[q];
         const evList = qEvents.length === 0
             ? '<span class="empty-hint" style="font-size:0.75rem">기록 없음</span>'
-            : qEvents.map((ev, idx) => {
+            : qEvents.map((ev) => {
                 const globalIdx = AppState.matchEvents.indexOf(ev);
+                if (globalIdx === AppState.editingEventIdx) {
+                    return buildEditForm(ev, globalIdx);
+                }
+                const actions = `<span class="event-actions">
+                      <button class="event-edit" data-idx="${globalIdx}" title="수정">✎</button>
+                      <button class="event-delete" data-idx="${globalIdx}" title="삭제">✕</button>
+                    </span>`;
                 if (ev.type === 'goal') {
-                    const assStr = ev.assister ? `, 👟 ${ev.assister}` : '';
+                    const assStr = ev.assister ? `, 👟 ${escapeHtml(ev.assister)}` : '';
                     return `<div class="event-item event-goal">
-                      <span>⚽ ${ev.scorer}${assStr}</span>
-                      <button class="event-delete" onclick="removeMatchEvent(${globalIdx})">✕</button>
+                      <span>⚽ ${escapeHtml(ev.scorer)}${assStr}</span>
+                      ${actions}
                     </div>`;
                 } else {
                     return `<div class="event-item event-opponent">
                       <span>🔴 상대팀 득점</span>
-                      <button class="event-delete" onclick="removeMatchEvent(${globalIdx})">✕</button>
+                      ${actions}
                     </div>`;
                 }
             }).join('');
@@ -522,7 +534,7 @@ function renderLiveRecorder() {
     <div class="live-score-summary">
       <span class="live-team-name">FC 바르자</span>
       <span class="live-total-score">${totalUs} : ${totalThem}</span>
-      <span class="live-team-name">${AppState.matchOpponent}</span>
+      <span class="live-team-name">${escapeHtml(AppState.matchOpponent || '상대팀')}</span>
     </div>
 
     <div class="live-input-section">
@@ -532,12 +544,11 @@ function renderLiveRecorder() {
 
       <div class="live-action-row">
         <select id="live-scorer" class="live-select">
-          <option value="">득점자 선택</option>
+          <option value="">⚽ 득점자 선택</option>
           ${playerOpts}
         </select>
         <select id="live-assister" class="live-select">
-          <option value="">어시스트 (선택)</option>
-          <option value="">없음</option>
+          <option value="">👟 어시스트 없음</option>
           ${playerOpts}
         </select>
         <button id="live-add-goal" class="btn-goal">⚽ 골!</button>
@@ -586,10 +597,64 @@ function renderLiveRecorder() {
         renderLiveRecorder();
         showToast('🔴 상대팀 득점');
     });
+
+    // 기록 삭제
+    container.querySelectorAll('.event-delete').forEach(btn => {
+        btn.addEventListener('click', () => removeMatchEvent(parseInt(btn.dataset.idx, 10)));
+    });
+
+    // 기록 수정 시작 (인라인 폼 열기)
+    container.querySelectorAll('.event-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+            AppState.editingEventIdx = parseInt(btn.dataset.idx, 10);
+            renderLiveRecorder();
+        });
+    });
+
+    // 기록 수정 취소
+    container.querySelectorAll('.ev-edit-cancel').forEach(btn => {
+        btn.addEventListener('click', () => {
+            AppState.editingEventIdx = null;
+            renderLiveRecorder();
+        });
+    });
+
+    // 기록 수정 저장
+    container.querySelectorAll('.ev-edit-save').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.idx, 10);
+            const ev = AppState.matchEvents[idx];
+            const form = btn.closest('.event-edit-form');
+            if (!ev || !form) { AppState.editingEventIdx = null; renderLiveRecorder(); return; }
+
+            const qSel = form.querySelector('.ev-edit-quarter');
+            const newQuarter = qSel ? qSel.value : ev.quarter;
+
+            if (ev.type === 'goal') {
+                const scorer = form.querySelector('.ev-edit-scorer').value;
+                if (!scorer) { showToast('득점자를 선택해주세요.', 'error'); return; }
+                const assister = form.querySelector('.ev-edit-assister').value || null;
+                if (assister && assister === scorer) {
+                    showToast('득점자와 도움이 같을 수 없습니다.', 'error'); return;
+                }
+                ev.scorer = scorer;
+                ev.assister = assister;
+            }
+            ev.quarter = newQuarter;
+
+            AppState.editingEventIdx = null;
+            AppState.liveQuarter = newQuarter; // 수정한 쿼터로 포커스 이동
+            recalcFromEvents();
+            renderLiveRecorder();
+            showToast('기록을 수정했습니다. ✏️');
+        });
+    });
 }
 
 function removeMatchEvent(idx) {
     AppState.matchEvents.splice(idx, 1);
+    // 삭제 시 인덱스가 밀리므로 수정 중 상태는 해제
+    AppState.editingEventIdx = null;
     recalcFromEvents();
     renderLiveRecorder();
 }
@@ -824,7 +889,7 @@ function renderDuplicateWarning(matchTitle, isDraft) {
     if (!el) return;
     el.innerHTML = `
     <div class="dup-box">
-      <p>⚠️ <strong>${matchTitle}</strong> 기록이 이미 존재합니다.</p>
+      <p>⚠️ <strong>${escapeHtml(matchTitle)}</strong> 기록이 이미 존재합니다.</p>
       <div class="dup-actions">
         <button class="btn-overwrite" onclick="handleSave(${isDraft}, true)">
           덮어쓰기 (${isDraft ? '임시' : '확정'})
@@ -894,6 +959,7 @@ function loadMatchToEditor(matchData) {
 
     // 이벤트 로그 복원
     AppState.matchEvents = matchData.match_events || [];
+    AppState.editingEventIdx = null;
 
     // UI 동기화
     const fp = document.getElementById('match-date')._flatpickr;

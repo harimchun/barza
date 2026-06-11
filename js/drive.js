@@ -171,12 +171,39 @@ async function initGoogleAuth() {
 
 // ── 편집 버튼 표시 제어 ────────────────────────────────────────────────────
 function updateEditButtonsVisibility() {
+    // body에 역할 클래스를 부여 → CSS에서 읽기 전용 모드 스타일 적용
+    document.body.classList.toggle('is-editor', AppState.isEditor);
+    document.body.classList.toggle('is-viewer', !AppState.isEditor);
+
     const editorOnly = document.querySelectorAll('.editor-only');
     editorOnly.forEach(el => {
-        el.style.opacity = AppState.isEditor ? '1' : '0.35';
-        el.style.pointerEvents = AppState.isEditor ? '' : 'none';
-        el.title = AppState.isEditor ? '' : '편집 권한 필요';
+        if (AppState.isEditor) {
+            el.removeAttribute('disabled');
+            el.removeAttribute('aria-disabled');
+            el.title = '';
+        } else {
+            // 버튼류는 disabled, 그 외에는 aria-disabled로 표시 (CSS가 처리)
+            if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+                el.setAttribute('disabled', '');
+            }
+            el.setAttribute('aria-disabled', 'true');
+            el.title = AppState.currentUser ? '편집 권한이 없습니다' : '로그인 후 편집 가능';
+        }
     });
+
+    // tab1 읽기 전용 안내 배너
+    const notice = document.getElementById('role-notice');
+    if (notice) {
+        if (AppState.isEditor) {
+            notice.style.display = 'none';
+        } else {
+            notice.style.display = 'block';
+            notice.className = 'role-notice-banner';
+            notice.textContent = AppState.currentUser
+                ? '👀 읽기 전용 모드 — 편집 권한이 없어 저장할 수 없습니다.'
+                : '👀 읽기 전용 모드 — 로그인하면 경기를 기록하고 저장할 수 있습니다.';
+        }
+    }
 }
 
 async function loadAllData() {

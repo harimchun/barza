@@ -50,6 +50,7 @@
        TAB 1: 당일 경기 운영
        ================================================ -->
     <div id="tab1" class="tab-panel active">
+      <div id="role-notice"></div>
       <div id="edit-mode-notice"></div>
 
       <!-- 경기 기본 정보 -->
@@ -89,8 +90,8 @@
           <div class="card">
             <div class="card-title">1. 참석자 선택</div>
             <div class="guest-add-row">
-              <input type="text" id="guest-name-input" placeholder="게스트(용병) 이름">
-              <button id="add-guest-btn" class="btn-secondary">+ 추가</button>
+              <input type="text" id="guest-name-input" class="editor-only" placeholder="게스트(용병) 이름">
+              <button id="add-guest-btn" class="btn-secondary editor-only">+ 추가</button>
             </div>
             <div id="player-checklist" class="player-checklist">
               <p class="empty-hint" style="padding:0.5rem">로그인 후 명단이 표시됩니다.</p>
