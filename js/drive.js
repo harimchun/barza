@@ -8,8 +8,17 @@ const DB_NODES = {
     passcode: '/settings/edit_passcode.json',
 };
 
-function dbUrl(node) {
-    return CONFIG.FIREBASE_DB_URL.replace(/\/$/, '') + node;
+function dbUrl(node, token) {
+    const base = CONFIG.FIREBASE_DB_URL.replace(/\/$/, '') + node;
+    return token ? `${base}?auth=${encodeURIComponent(token)}` : base;
+}
+
+// 현재 익명 사용자(또는 없음)의 ID 토큰 — 쓰기 요청에 첨부
+async function getIdToken() {
+    try {
+        const u = window._fbAuth && window._fbAuth.currentUser;
+        return u ? await u.getIdToken() : null;
+    } catch { return null; }
 }
 
 // ── 편집 암호 해시 (공유 암호 기반 편집 권한) ──────────────────────────────
@@ -208,12 +217,36 @@ async function fbGet(node) {
 }
 
 async function fbPut(node, data) {
-    const resp = await fetch(dbUrl(node), {
+    const token = await getIdToken();
+    const resp = await fetch(dbUrl(node, token), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
-    if (!resp.ok) throw new Error(`DB 쓰기 실패: ${resp.status}`);
+    if (!resp.ok) {
+        // 401/403이면 보통 익명 인증 미설정 또는 쓰기 규칙 문제
+        const hint = (resp.status === 401 || resp.status === 403)
+            ? ' (Firebase 콘솔에서 "익명" 로그인 활성화 + 규칙 .write: "auth != null" 확인)'
+            : '';
+        throw new Error(`DB 쓰기 실패: ${resp.status}${hint}`);
+    }
+}
+
+// ── 익명 인증 (쓰기 요청 토큰 확보) ────────────────────────────────────────
+// 읽기는 토큰 없이 가능하지만, 쓰기 규칙이 auth != null 이라 익명 로그인으로 토큰을 얻는다.
+// 팀원 개별 로그인은 필요 없으며, 화면상 편집 권한은 "공유 암호"가 따로 제어한다.
+async function initAnonymousAuth() {
+    try {
+        if (typeof firebase === 'undefined') return;
+        if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+        window._fbAuth = firebase.auth();
+        if (!window._fbAuth.currentUser) {
+            await window._fbAuth.signInAnonymously();
+        }
+    } catch (e) {
+        // 익명 로그인이 콘솔에서 아직 비활성이면 여기로 옴 → 읽기는 가능, 저장 시 안내 표시
+        console.warn('익명 인증 실패 — Firebase 콘솔에서 "익명" 로그인을 켜주세요:', e && (e.code || e.message));
+    }
 }
 
 // ── 초기화 ────────────────────────────────────────────────────────────────
@@ -224,6 +257,9 @@ async function initBackend() {
     }
 
     updateEditModeUI('loading');
+
+    // 익명 인증 먼저 (쓰기에 필요) — 실패해도 읽기는 진행
+    await initAnonymousAuth();
 
     // 데이터 + 편집 암호 로드 (읽기는 인증 불필요)
     try {
