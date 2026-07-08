@@ -91,7 +91,7 @@ function renderFormationOverview() {
             // 점
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#8C1C2B';
+            ctx.fillStyle = '#A50044';
             ctx.fill();
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 1;

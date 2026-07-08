@@ -51,7 +51,7 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.fillRect(ox, oy, w, 28);
-    ctx.fillStyle = '#f0b429';
+    ctx.fillStyle = '#EDBB00';
     ctx.font = `bold ${Math.max(11, w * 0.032)}px "Inter", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -77,16 +77,16 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
         ctx.save();
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#1d3461';
+        ctx.fillStyle = '#0c2c56';
         ctx.fill();
-        ctx.strokeStyle = '#f0b429';
+        ctx.strokeStyle = '#EDBB00';
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.restore();
 
         // 포지션 라벨
         ctx.save();
-        ctx.fillStyle = '#f0b429';
+        ctx.fillStyle = '#EDBB00';
         ctx.font = `bold ${Math.max(8, radius * 0.55)}px "Inter", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
