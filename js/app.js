@@ -84,6 +84,7 @@ const AppState = {
     formationTypes: { '1Q': '4-2-3-1', '2Q': '4-2-3-1', '3Q': '4-2-3-1', '4Q': '4-2-3-1' },
     formationState: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: name } }
     formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: name } }
+    formationCoords: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: {left,top}% } } 카드 자유 배치 오버라이드
     quarterScores: { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] },
     matchStats: {},  // { name: { goals: 0, assists: 0 } }
     matchEvents: [], // [{ quarter, type:'goal'|'opponentGoal', scorer, assister }]
@@ -158,6 +159,7 @@ function resetMatchState() {
     AppState.formationTypes = { '1Q': '4-2-3-1', '2Q': '4-2-3-1', '3Q': '4-2-3-1', '4Q': '4-2-3-1' };
     AppState.formationState = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
     AppState.formationSubs = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
+    AppState.formationCoords = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
     AppState.quarterScores = { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
     AppState.matchStats = {};
     AppState.matchEvents = [];

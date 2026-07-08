@@ -60,33 +60,14 @@ function renderFormationOverview() {
             return;
         }
 
-        // 포지션별 (yRatio, xRatio) 매핑 — POS_COORDS의 100x70 pitch 기준과 일치
-        // pitch x: 0=GK side → 100=ST side (왼쪽=수비, 오른쪽=공격)
-        // canvas: overview는 top=GK, bottom=ST 세로 레이아웃으로 표시
-        // x → W, y → H 방향으로 매핑
-        const POS_XY = {
-            'GK': { y: 0.88, x: 0.50 },
-            'LB': { y: 0.72, x: 0.15 }, 'LCB': { y: 0.72, x: 0.35 },
-            'RCB': { y: 0.72, x: 0.65 }, 'RB': { y: 0.72, x: 0.85 },
-            'CB': { y: 0.72, x: 0.50 },
-            'LDM': { y: 0.57, x: 0.33 }, 'RDM': { y: 0.57, x: 0.67 }, 'CDM': { y: 0.57, x: 0.50 },
-            'LCM': { y: 0.42, x: 0.20 }, 'CM': { y: 0.42, x: 0.50 }, 'RCM': { y: 0.42, x: 0.80 },
-            'LM': { y: 0.42, x: 0.15 }, 'RM': { y: 0.42, x: 0.85 },
-            'CAM': { y: 0.42, x: 0.50 },
-            'LW': { y: 0.28, x: 0.20 }, 'RW': { y: 0.28, x: 0.80 },
-            'ST': { y: 0.15, x: 0.50 }, 'CF': { y: 0.15, x: 0.50 },
-            'MF0': { y: 0.42, x: 0.20 }, 'MF1': { y: 0.42, x: 0.50 }, 'MF2': { y: 0.42, x: 0.80 },
-            'LCM_442': { y: 0.42, x: 0.33 }, 'RCM_442': { y: 0.42, x: 0.67 },
-        };
-
-        // 4-4-2의 LCM/RCM 처리: 실제 포지션 키로 매핑
+        // 빌더 좌표계(left/top %)를 그대로 사용 — 커스텀 드래그 배치도 미니맵에 반영
         const formationType = AppState.formationTypes[q] || '4-2-3-1';
         const posEntries = Object.entries(formation).filter(([, player]) => player && player !== '-');
 
         posEntries.forEach(([pos, player]) => {
-            const coord = POS_XY[pos];
-            const cx = coord ? W * coord.x : W * 0.5;
-            const cy = coord ? H * coord.y : H * 0.5;
+            const coord = getPosCoord(q, pos, formationType);
+            const cx = W * (coord.left / 100);
+            const cy = H * (coord.top / 100);
             const r = W * 0.038;
             // 점
             ctx.beginPath();
@@ -280,12 +261,7 @@ function getPosRowKey(pos, fType) {
     return 'mf';
 }
 
-// ── 포메이션 인터랙션 (드래그 & 드롭 / 탭-탭 배치) ──────────────────────────
-// fbSelected: 탭 배치용 선택 상태 { kind:'bench'|'pos', name?, pos? }
-let fbSelected = null;
-
-function fbClearSelection() { fbSelected = null; }
-
+// ── 포메이션 배치 헬퍼 ─────────────────────────────────────────────────────
 function playerInFormationQ(playerName, q) {
     const fm = AppState.formationState[q];
     const fs = AppState.formationSubs[q];
@@ -307,35 +283,19 @@ function fbRefresh() {
     renderFormationOverview();
 }
 
-// 메인 배치 공용: 벤치→포지션 / 포지션→포지션(스왑·이동)
-function fbAssign(q, pos, name) {
-    if (!name || name === '-' || !pos) return;
-    const fMap = AppState.formationState[q];
-    if (fMap[pos] === name) { fbClearSelection(); fbRefresh(); return; }
-    const fromPos = Object.keys(fMap).find(p => fMap[p] === name);
-    const displaced = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
-
-    fMap[pos] = name;
-    if (fromPos) fMap[fromPos] = displaced || '-'; // 포지션 간 이동은 스왑
-
-    fbSetSquad(q, name, true);
-    if (displaced && !fromPos && !playerInFormationQ(displaced, q)) {
-        fbSetSquad(q, displaced, false); // 벤치에서 밀려난 선수는 스쿼드에서도 해제
-    }
-    fbClearSelection();
-    fbRefresh();
-}
-
-function fbClearPos(q, pos) {
+// 주전 선택 (드롭다운)
+function fbApplyMain(q, pos, val) {
     const fMap = AppState.formationState[q];
     const old = fMap[pos];
-    if (!old || old === '-') return;
-    fMap[pos] = '-';
-    if (!playerInFormationQ(old, q)) fbSetSquad(q, old, false);
-    fbClearSelection();
+    fMap[pos] = val;
+    if (val !== '-') fbSetSquad(q, val, true);
+    if (old && old !== '-' && old !== val && !playerInFormationQ(old, q)) {
+        fbSetSquad(q, old, false);
+    }
     fbRefresh();
 }
 
+// 교체 선택 (드롭다운)
 function fbApplySub(q, pos, val) {
     const fSubs = AppState.formationSubs[q];
     const old = fSubs[pos];
@@ -347,16 +307,11 @@ function fbApplySub(q, pos, val) {
     fbRefresh();
 }
 
-// 탭 선택 하이라이트만 갱신 (전체 재렌더 없이)
-function fbPaintSelection() {
-    document.querySelectorAll('.bench-chip').forEach(ch => {
-        ch.classList.toggle('selected',
-            !!(fbSelected && fbSelected.kind === 'bench' && ch.dataset.name === fbSelected.name));
-    });
-    document.querySelectorAll('#formation-builder .pos-cell').forEach(cell => {
-        cell.classList.toggle('selected',
-            !!(fbSelected && fbSelected.kind === 'pos' && cell.dataset.pos === fbSelected.pos));
-    });
+// 포지션 카드 좌표: 사용자 드래그 오버라이드 → 포메이션 기본값 순
+function getPosCoord(q, pos, fType) {
+    const custom = AppState.formationCoords && AppState.formationCoords[q] && AppState.formationCoords[q][pos];
+    if (custom && typeof custom.left === 'number' && typeof custom.top === 'number') return custom;
+    return (PITCH_POS_COORDS[fType] || {})[pos] || { left: 50, top: 50 };
 }
 
 function renderFormationBuilder() {
@@ -394,13 +349,12 @@ function renderFormationBuilder() {
             const part = getParticipation(n);
             const pLabel = part ? `<em>${part % 1 === 0 ? part : part.toFixed(1)}Q</em>` : '';
             const isGuest = AppState.roster[n] === 'Guest';
-            const sel = fbSelected && fbSelected.kind === 'bench' && fbSelected.name === n ? ' selected' : '';
-            return `<span class="bench-chip${isGuest ? ' is-guest' : ''}${sel}" data-name="${escapeHtml(n)}">${escapeHtml(n)}${pLabel}</span>`;
+            return `<span class="bench-chip${isGuest ? ' is-guest' : ''}">${escapeHtml(n)}${pLabel}</span>`;
         }).join('');
         bench.innerHTML = `
       <div class="bench-head">
-        <span class="bench-title">🪑 벤치 <span class="bench-count">${benchPlayers.length}</span></span>
-        <span class="bench-hint">칩을 포지션으로 드래그 · 또는 탭 → 포지션 탭</span>
+        <span class="bench-title">🪑 미배치 <span class="bench-count">${benchPlayers.length}</span></span>
+        <span class="bench-hint">선수는 카드의 드롭다운으로 선택 · 카드를 끌면 위치 자유 조정</span>
       </div>
       <div class="bench-chips">${
             AppState.attendees.length === 0
@@ -409,45 +363,49 @@ function renderFormationBuilder() {
         }</div>`;
     }
 
-    // 교체 선수 드롭다운 옵션 (주전/교체로 이미 배정된 선수 제외)
-    function buildSubOptions(pos) {
-        const current = fSubs[pos] || '-';
-        const taken = new Set();
+    // 선수 드롭다운 옵션 (다른 포지션 주전/교체로 배정된 선수 제외)
+    function buildOptions(pos, type) {
+        const current = type === 'main' ? (fMap[pos] || '-') : (fSubs[pos] || '-');
+
+        const assignedMainOther = new Set();
+        const assignedSubOther = new Set();
         for (const [p, player] of Object.entries(fMap)) {
-            if (player && player !== '-' && !(p === pos && false)) taken.add(player);
+            if (p === pos) continue;
+            if (player && player !== '-') assignedMainOther.add(player);
         }
         for (const [p, s] of Object.entries(fSubs)) {
             if (p === pos) continue;
-            if (s && s !== '-') taken.add(s);
+            if (s && s !== '-') assignedSubOther.add(s);
         }
-        const opts = AppState.attendees.filter(n => n === current || !taken.has(n));
+
+        const opts = AppState.attendees.filter(n => {
+            if (n === current) return true;
+            if (assignedMainOther.has(n) || assignedSubOther.has(n)) return false;
+            if (type === 'sub') return n !== (fMap[pos] || '');
+            return true;
+        });
+
         const optionHtml = opts.map(n => {
             const role = AppState.roster[n] === 'Guest' ? ' (용병)' : '';
             return `<option value="${escapeHtml(n)}" ${n === current ? 'selected' : ''}>${escapeHtml(n)}${role}</option>`;
         }).join('');
-        return `<option value="-" ${current === '-' ? 'selected' : ''}>교체 없음</option>${optionHtml}`;
+
+        const noneLabel = type === 'main' ? '선택' : '교체 없음';
+        return `<option value="-" ${current === '-' ? 'selected' : ''}>${noneLabel}</option>${optionHtml}`;
     }
 
     function buildPosCell(pos) {
         const label = (POSITION_DISPLAY_LABELS[fType] || {})[pos] || pos;
-        const coord = coords[pos] || { left: 50, top: 50 };
+        const coord = getPosCoord(q, pos, fType);
         const rowKey = getPosRowKey(pos, fType);
         const hasSub = fSubs[pos] && fSubs[pos] !== '-';
-        const player = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
-        const isGuest = player && AppState.roster[player] === 'Guest';
-        const sel = fbSelected && fbSelected.kind === 'pos' && fbSelected.pos === pos ? ' selected' : '';
-        const playerChip = player
-            ? `<div class="pos-player${isGuest ? ' is-guest' : ''}" data-pos="${escapeHtml(pos)}">
-                 <span class="pos-player-name">${escapeHtml(player)}</span>
-                 <button type="button" class="pos-clear" title="벤치로 보내기" aria-label="${escapeHtml(player)} 배치 해제">×</button>
-               </div>`
-            : `<div class="pos-player empty" data-pos="${escapeHtml(pos)}"><span class="pos-player-name">＋</span></div>`;
+        const filled = fMap[pos] && fMap[pos] !== '-';
         return `
-      <div class="pos-cell ${player ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''}${sel}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
+      <div class="pos-cell ${filled ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
         <button type="button" class="pos-sub-toggle ${hasSub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정/해제" aria-label="교체 선수 지정">⇄</button>
-        <div class="pos-badge pos-badge-${rowKey}">${escapeHtml(label)}</div>
-        ${playerChip}
-        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildSubOptions(pos)}</select>
+        <div class="pos-badge pos-badge-${rowKey}" title="드래그하여 위치 이동">${escapeHtml(label)}</div>
+        <select class="pos-main-sel" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수">${buildOptions(pos, 'main')}</select>
+        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildOptions(pos, 'sub')}</select>
       </div>`;
     }
 
@@ -486,120 +444,63 @@ function renderFormationBuilder() {
         });
     });
 
-    // ── 배치 해제 (×) ──
-    container.querySelectorAll('.pos-clear').forEach(btn => {
-        btn.addEventListener('pointerdown', e => e.stopPropagation());
-        btn.addEventListener('click', e => {
-            e.stopPropagation();
-            fbClearPos(q, btn.closest('.pos-cell').dataset.pos);
-        });
+    // ── 주전 선택 (드롭다운) ──
+    container.querySelectorAll('.pos-main-sel').forEach(sel => {
+        sel.addEventListener('change', () => fbApplyMain(q, sel.dataset.pos, sel.value));
+        sel.addEventListener('pointerdown', e => e.stopPropagation());
     });
 
-    // ── 드래그 & 탭 인터랙션 ──
-    const DRAG_THRESHOLD = 7;
-
-    function handleTap(src) {
-        const fm = AppState.formationState[q];
-        if (src.kind === 'bench') {
-            if (fbSelected && fbSelected.kind === 'pos') { fbAssign(q, fbSelected.pos, src.name); return; }
-            fbSelected = (fbSelected && fbSelected.kind === 'bench' && fbSelected.name === src.name)
-                ? null : { kind: 'bench', name: src.name };
-            fbPaintSelection();
-        } else {
-            const occupant = fm[src.pos] && fm[src.pos] !== '-' ? fm[src.pos] : null;
-            if (fbSelected && fbSelected.kind === 'bench') { fbAssign(q, src.pos, fbSelected.name); return; }
-            if (fbSelected && fbSelected.kind === 'pos') {
-                if (fbSelected.pos === src.pos) { fbSelected = null; fbPaintSelection(); return; }
-                const selOcc = fm[fbSelected.pos] && fm[fbSelected.pos] !== '-' ? fm[fbSelected.pos] : null;
-                if (selOcc) { fbAssign(q, src.pos, selOcc); return; }      // 선택한 선수를 이 자리로 (스왑 포함)
-                if (occupant) { fbAssign(q, fbSelected.pos, occupant); return; } // 빈 선택 자리로 이 선수를
-            }
-            fbSelected = { kind: 'pos', pos: src.pos };
-            fbPaintSelection();
-        }
-    }
-
-    function startPress(e, src) {
-        if (e.button !== undefined && e.button !== 0) return;
-        const el = e.currentTarget;
-        const startX = e.clientX, startY = e.clientY;
-        let dragging = false, ghost = null, lastTarget = null, moved = false;
-
-        const onMove = ev => {
-            const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
-            if (!dragging) {
-                if (dist < DRAG_THRESHOLD) return;
-                moved = true;
-                if (!src.canDrag) return; // 드래그 불가 소스는 탭만 취소
-                dragging = true;
-                ghost = document.createElement('div');
-                ghost.className = 'drag-ghost';
-                ghost.textContent = src.name;
-                document.body.appendChild(ghost);
-                (src.chipEl || el).classList.add('drag-src');
-            }
-            ghost.style.left = ev.clientX + 'px';
-            ghost.style.top = ev.clientY + 'px';
-            const under = document.elementFromPoint(ev.clientX, ev.clientY);
-            const target = (under && under.closest('.pos-cell')) || (under && under.closest('#formation-bench'));
-            if (lastTarget && lastTarget !== target) lastTarget.classList.remove('drop-hover');
-            if (target && target !== lastTarget) target.classList.add('drop-hover');
-            lastTarget = target;
-            ev.preventDefault();
-        };
-
-        const finish = () => {
-            el.removeEventListener('pointermove', onMove);
-            el.removeEventListener('pointerup', onUp);
-            el.removeEventListener('pointercancel', onCancel);
-            try { el.releasePointerCapture(e.pointerId); } catch { /* noop */ }
-            if (ghost) ghost.remove();
-            if (lastTarget) lastTarget.classList.remove('drop-hover');
-            (src.chipEl || el).classList.remove('drag-src');
-        };
-
-        const onUp = ev => {
-            finish();
-            if (dragging) {
-                const under = document.elementFromPoint(ev.clientX, ev.clientY);
-                const cell = under && under.closest('.pos-cell');
-                const benchZone = under && under.closest('#formation-bench');
-                if (cell) fbAssign(q, cell.dataset.pos, src.name);
-                else if (benchZone && src.kind === 'pos') fbClearPos(q, src.pos);
-            } else if (!moved) {
-                handleTap(src);
-            }
-        };
-
-        const onCancel = () => finish();
-
-        try { el.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
-        el.addEventListener('pointermove', onMove);
-        el.addEventListener('pointerup', onUp);
-        el.addEventListener('pointercancel', onCancel);
-    }
-
-    // 벤치 칩: 드래그 소스 + 탭 선택
-    if (bench) {
-        bench.querySelectorAll('.bench-chip').forEach(chip => {
-            chip.addEventListener('pointerdown', e => {
-                startPress(e, { kind: 'bench', name: chip.dataset.name, canDrag: true, chipEl: chip });
-            });
-        });
-    }
-
-    // 포지션 카드: 채워진 칩은 드래그 소스, 카드 전체는 탭 타깃
+    // ── 포지션 카드 자유 이동 (전술 보드처럼 드래그) ──
     container.querySelectorAll('.pos-cell').forEach(cell => {
         cell.addEventListener('pointerdown', e => {
-            if (e.target.closest('.pos-sub-toggle, .pos-sub-sel, .pos-clear')) return;
+            if (e.button !== undefined && e.button !== 0) return;
+            if (e.target.closest('select, .pos-sub-toggle')) return; // 컨트롤 조작은 드래그 아님
+
             const pos = cell.dataset.pos;
-            const occupant = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
-            const onChip = !!e.target.closest('.pos-player:not(.empty)');
-            startPress(e, {
-                kind: 'pos', pos, name: occupant,
-                canDrag: !!(occupant && onChip),
-                chipEl: cell.querySelector('.pos-player'),
-            });
+            const rect = container.getBoundingClientRect();
+            const startX = e.clientX, startY = e.clientY;
+            // 카드 중심이 타이틀바 아래·피치 안에 머물도록 클램프 범위 계산
+            const topMin = (34 / rect.height) * 100 + 4;
+            let moved = false;
+
+            const onMove = ev => {
+                if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+                moved = true;
+                cell.classList.add('dragging');
+                let left = ((ev.clientX - rect.left) / rect.width) * 100;
+                let top = ((ev.clientY - rect.top) / rect.height) * 100;
+                left = Math.min(93, Math.max(7, left));
+                top = Math.min(95, Math.max(topMin, top));
+                cell.style.left = left.toFixed(1) + '%';
+                cell.style.top = top.toFixed(1) + '%';
+                ev.preventDefault();
+            };
+
+            const finish = () => {
+                cell.removeEventListener('pointermove', onMove);
+                cell.removeEventListener('pointerup', onUp);
+                cell.removeEventListener('pointercancel', onUp);
+                try { cell.releasePointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
+                cell.classList.remove('dragging');
+            };
+
+            const onUp = () => {
+                finish();
+                if (moved) {
+                    if (!AppState.formationCoords) AppState.formationCoords = {};
+                    if (!AppState.formationCoords[q]) AppState.formationCoords[q] = {};
+                    AppState.formationCoords[q][pos] = {
+                        left: parseFloat(cell.style.left),
+                        top: parseFloat(cell.style.top),
+                    };
+                    renderFormationOverview(); // 미니맵에 즉시 반영
+                }
+            };
+
+            try { cell.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
+            cell.addEventListener('pointermove', onMove);
+            cell.addEventListener('pointerup', onUp);
+            cell.addEventListener('pointercancel', onUp);
         });
     });
 }
@@ -954,7 +855,6 @@ function initTab1Events() {
         document.querySelectorAll('.qbtn').forEach(b => b.classList.toggle('active', b.dataset.q === AppState.currentQuarter));
         // 포메이션 타입 셀렉트 동기화
         document.getElementById('formation-type-select').value = AppState.formationTypes[AppState.currentQuarter];
-        fbClearSelection();
         renderFormationBuilder();
     });
 
@@ -963,11 +863,22 @@ function initTab1Events() {
         const q = AppState.currentQuarter;
         const newType = e.target.value;
         AppState.formationTypes[q] = newType;
-        // 해당 쿼터 배치 초기화
+        // 해당 쿼터 배치·커스텀 좌표 초기화
         AppState.formationState[q] = {};
         AppState.formationSubs[q] = {};
-        fbClearSelection();
+        AppState.formationCoords[q] = {};
         renderFormationBuilder();
+        renderFormationOverview();
+    });
+
+    // 포지션 위치 초기화 (커스텀 배치 → 포메이션 기본값)
+    const resetBtn = document.getElementById('formation-reset-btn');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+        const q = AppState.currentQuarter;
+        AppState.formationCoords[q] = {};
+        renderFormationBuilder();
+        renderFormationOverview();
+        showToast(`${q} 포지션 위치를 기본 배치로 되돌렸습니다. ↺`);
     });
 
     // 포메이션 이미지 다운로드
@@ -1049,6 +960,7 @@ async function handleSave(isDraft, overwrite = false) {
         formation_types: { ...AppState.formationTypes },
         formation_plan: JSON.parse(JSON.stringify(AppState.formationState)),
         formation_subs: JSON.parse(JSON.stringify(AppState.formationSubs)),
+        formation_coords: JSON.parse(JSON.stringify(AppState.formationCoords || {})),
         match_stats: statsRecords,
         match_events: JSON.parse(JSON.stringify(AppState.matchEvents || [])),
         is_draft: isDraft,
@@ -1139,6 +1051,13 @@ function loadMatchToEditor(matchData) {
         '2Q': savedSubs['2Q'] || {},
         '3Q': savedSubs['3Q'] || {},
         '4Q': savedSubs['4Q'] || {},
+    };
+    const savedCoords = matchData.formation_coords || {};
+    AppState.formationCoords = {
+        '1Q': savedCoords['1Q'] || {},
+        '2Q': savedCoords['2Q'] || {},
+        '3Q': savedCoords['3Q'] || {},
+        '4Q': savedCoords['4Q'] || {},
     };
     AppState.quarterScores = matchData.scores || { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
 

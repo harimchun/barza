@@ -107,7 +107,7 @@ function renderMatchDetail(match) {
   const hasFormation = match.formation_plan && Object.values(match.formation_plan).some(f => Object.keys(f).length > 0);
   const formationSection = hasFormation
     ? `<img class="formation-image" src="${buildCombinedFormationImage(
-      match.formation_plan, match.formation_subs, match.formation_types)}" alt="포메이션">`
+      match.formation_plan, match.formation_subs, match.formation_types, match.formation_coords)}" alt="포메이션">`
     : '<p class="empty-hint">저장된 포메이션 데이터가 없습니다.</p>';
 
   container.innerHTML = `

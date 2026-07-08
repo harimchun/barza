@@ -13,8 +13,9 @@
  * @param {Object} fMap   - { pos: playerName }
  * @param {Object} fSubs  - { pos: subPlayerName }
  * @param {string} fType  - 포메이션 문자열
+ * @param {Object} [coordsMap] - { pos: {left, top} } 빌더 좌표계(세로 피치 %) — 드래그 커스텀 배치 반영
  */
-function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
+function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType, coordsMap) {
     // --- 배경: 잔디 ---
     ctx.fillStyle = '#2d6a4f';
     ctx.fillRect(ox, oy, w, h);
@@ -64,7 +65,13 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
 
     for (const [pos, player] of Object.entries(fMap)) {
         if (!player || player === '-') continue;
-        const coord = POS_COORDS[pos];
+
+        // 좌표: 빌더 좌표계(세로 left/top %) 우선 → 가로 캔버스(x 0-100 GK→ST, y 0-70)로 변환.
+        // 없으면 레거시 POS_COORDS 폴백 (커스텀 좌표 없는 옛 기록).
+        const bc = coordsMap && coordsMap[pos];
+        const coord = (bc && typeof bc.left === 'number' && typeof bc.top === 'number')
+            ? [Math.max(3, Math.min(97, 100 - bc.top)), Math.max(4, Math.min(66, 70 - bc.left * 0.7))]
+            : POS_COORDS[pos];
         if (!coord) continue;
 
         // pitch-to-canvas 변환 (pitch: 0-100 x, 0-70 y with y=0 at bottom after flip)
@@ -108,6 +115,12 @@ function drawQuarterFormation(ctx, ox, oy, w, h, quarter, fMap, fSubs, fType) {
     }
 }
 
+// 쿼터별 최종 카드 좌표 (포메이션 기본값 + 사용자 드래그 오버라이드 병합)
+function mergedBuilderCoords(fType, overrides) {
+    const defaults = (typeof PITCH_POS_COORDS !== 'undefined' && PITCH_POS_COORDS[fType]) || {};
+    return Object.assign({}, defaults, overrides || {});
+}
+
 /**
  * 현재 AppState의 4개 쿼터 포메이션을 2x2 그리드로 합성 → PNG 다운로드
  */
@@ -130,7 +143,8 @@ function exportCombinedFormation() {
             ctx, ox, oy, qW, qH, q,
             AppState.formationState[q],
             AppState.formationSubs[q],
-            AppState.formationTypes[q]
+            AppState.formationTypes[q],
+            mergedBuilderCoords(AppState.formationTypes[q], (AppState.formationCoords || {})[q])
         );
     });
 
@@ -148,7 +162,7 @@ function exportCombinedFormation() {
 /**
  * 4개 쿼터 포메이션을 이미지 src로 반환 (기록 조회 탭용)
  */
-function buildCombinedFormationImage(formationPlan, formationSubs, formationTypes) {
+function buildCombinedFormationImage(formationPlan, formationSubs, formationTypes, formationCoords) {
     const qW = 600, qH = 400;
     const canvas = document.createElement('canvas');
     canvas.width = qW * 2;
@@ -165,7 +179,8 @@ function buildCombinedFormationImage(formationPlan, formationSubs, formationType
             ctx, col * qW, row * qH, qW, qH, q,
             formationPlan?.[q] || {},
             formationSubs?.[q] || {},
-            formationTypes?.[q] || '?'
+            formationTypes?.[q] || '?',
+            mergedBuilderCoords(formationTypes?.[q], formationCoords?.[q])
         );
     });
     return canvas.toDataURL('image/png');
