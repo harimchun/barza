@@ -913,7 +913,208 @@ input[type="checkbox"] {
   outline: none;
 }
 
-.pos-main-sel { font-weight: 600; }
+/* --- 포지션 선수 칩 (드래그 소스 / 탭 타깃) --- */
+.pos-player {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 0.22rem 1rem 0.22rem 0.5rem;
+  background: rgba(22, 22, 22, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+.pos-player:active {
+  cursor: grabbing;
+}
+
+.pos-player.empty {
+  color: var(--text-muted);
+  font-weight: 500;
+  border-style: dashed;
+  padding: 0.22rem 0.5rem;
+  cursor: pointer;
+  touch-action: auto;
+}
+
+.pos-player.is-guest .pos-player-name {
+  color: var(--gold);
+}
+
+.pos-player-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.pos-player.drag-src,
+.bench-chip.drag-src {
+  opacity: 0.35;
+}
+
+/* 배치 해제 × */
+.pos-clear {
+  position: absolute;
+  right: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.pos-clear:hover {
+  color: #f87171;
+  background: rgba(230, 57, 70, 0.18);
+}
+
+/* 탭 선택 / 드롭 대상 하이라이트 */
+.pos-cell.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-dim), 0 6px 16px rgba(0, 0, 0, 0.5);
+  z-index: 35;
+}
+
+.pos-cell.drop-hover {
+  border-color: var(--gold);
+  background: rgba(237, 187, 0, 0.16);
+  transform: translate(-50%, -50%) scale(1.07);
+  z-index: 45;
+}
+
+/* --- 벤치 (미배치 참석자) --- */
+.formation-bench {
+  margin-bottom: 0.6rem;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.7rem;
+  transition: var(--transition);
+}
+
+.formation-bench.drop-hover {
+  border-color: var(--gold);
+  background: rgba(237, 187, 0, 0.08);
+}
+
+.bench-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.45rem;
+}
+
+.bench-title {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.bench-count {
+  display: inline-block;
+  min-width: 18px;
+  text-align: center;
+  background: var(--burgundy-dim);
+  color: var(--burgundy-light);
+  border-radius: 999px;
+  padding: 0.02rem 0.35rem;
+  font-size: 0.7rem;
+}
+
+.bench-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.bench-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-height: 30px;
+  align-items: center;
+}
+
+.bench-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  transition: border-color var(--transition), background var(--transition), box-shadow var(--transition);
+}
+
+.bench-chip:active {
+  cursor: grabbing;
+}
+
+.bench-chip em {
+  font-style: normal;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+}
+
+.bench-chip.is-guest {
+  color: var(--gold);
+}
+
+.bench-chip:hover {
+  border-color: var(--burgundy-light);
+}
+
+.bench-chip.selected {
+  border-color: var(--gold);
+  background: rgba(237, 187, 0, 0.12);
+  box-shadow: 0 0 0 2px var(--gold-dim);
+}
+
+/* 드래그 고스트 (포인터 따라다니는 이름표) */
+.drag-ghost {
+  position: fixed;
+  z-index: 10001;
+  transform: translate(-50%, -130%);
+  pointer-events: none;
+  background: var(--burgundy);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+}
 
 /* 교체 토글 버튼 (카드 우상단, 카드 안쪽 — 피치 경계 잘림 방지) */
 .pos-sub-toggle {
@@ -995,6 +1196,31 @@ input[type="checkbox"] {
     height: 17px;
     top: 2px;
     right: 2px;
+  }
+
+  .pos-player {
+    min-height: 25px;
+    font-size: 0.68rem;
+    padding: 0.18rem 0.85rem 0.18rem 0.35rem;
+  }
+
+  .pos-player.empty {
+    padding: 0.18rem 0.35rem;
+  }
+
+  .pos-clear {
+    width: 15px;
+    height: 15px;
+    font-size: 0.74rem;
+  }
+
+  .bench-chip {
+    font-size: 0.74rem;
+    padding: 0.26rem 0.6rem;
+  }
+
+  .bench-hint {
+    display: none;
   }
 
   .pitch-title {

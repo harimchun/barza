@@ -280,6 +280,85 @@ function getPosRowKey(pos, fType) {
     return 'mf';
 }
 
+// ── 포메이션 인터랙션 (드래그 & 드롭 / 탭-탭 배치) ──────────────────────────
+// fbSelected: 탭 배치용 선택 상태 { kind:'bench'|'pos', name?, pos? }
+let fbSelected = null;
+
+function fbClearSelection() { fbSelected = null; }
+
+function playerInFormationQ(playerName, q) {
+    const fm = AppState.formationState[q];
+    const fs = AppState.formationSubs[q];
+    for (const p in fm) if (fm[p] === playerName && fm[p] !== '-') return true;
+    for (const p in fs) if (fs[p] === playerName && fs[p] !== '-') return true;
+    return false;
+}
+
+function fbSetSquad(q, name, on) {
+    if (!name || name === '-') return;
+    if (!AppState.squadPlan[name]) AppState.squadPlan[name] = {};
+    AppState.squadPlan[name][q] = on;
+}
+
+function fbRefresh() {
+    renderFormationBuilder();
+    renderSquadTable();
+    renderPlaytimeStats();
+    renderFormationOverview();
+}
+
+// 메인 배치 공용: 벤치→포지션 / 포지션→포지션(스왑·이동)
+function fbAssign(q, pos, name) {
+    if (!name || name === '-' || !pos) return;
+    const fMap = AppState.formationState[q];
+    if (fMap[pos] === name) { fbClearSelection(); fbRefresh(); return; }
+    const fromPos = Object.keys(fMap).find(p => fMap[p] === name);
+    const displaced = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
+
+    fMap[pos] = name;
+    if (fromPos) fMap[fromPos] = displaced || '-'; // 포지션 간 이동은 스왑
+
+    fbSetSquad(q, name, true);
+    if (displaced && !fromPos && !playerInFormationQ(displaced, q)) {
+        fbSetSquad(q, displaced, false); // 벤치에서 밀려난 선수는 스쿼드에서도 해제
+    }
+    fbClearSelection();
+    fbRefresh();
+}
+
+function fbClearPos(q, pos) {
+    const fMap = AppState.formationState[q];
+    const old = fMap[pos];
+    if (!old || old === '-') return;
+    fMap[pos] = '-';
+    if (!playerInFormationQ(old, q)) fbSetSquad(q, old, false);
+    fbClearSelection();
+    fbRefresh();
+}
+
+function fbApplySub(q, pos, val) {
+    const fSubs = AppState.formationSubs[q];
+    const old = fSubs[pos];
+    fSubs[pos] = val;
+    if (val !== '-') fbSetSquad(q, val, true);
+    if (old && old !== '-' && old !== val && !playerInFormationQ(old, q)) {
+        fbSetSquad(q, old, false);
+    }
+    fbRefresh();
+}
+
+// 탭 선택 하이라이트만 갱신 (전체 재렌더 없이)
+function fbPaintSelection() {
+    document.querySelectorAll('.bench-chip').forEach(ch => {
+        ch.classList.toggle('selected',
+            !!(fbSelected && fbSelected.kind === 'bench' && ch.dataset.name === fbSelected.name));
+    });
+    document.querySelectorAll('#formation-builder .pos-cell').forEach(cell => {
+        cell.classList.toggle('selected',
+            !!(fbSelected && fbSelected.kind === 'pos' && cell.dataset.pos === fbSelected.pos));
+    });
+}
+
 function renderFormationBuilder() {
     const container = document.getElementById('formation-builder');
     if (!container) return;
@@ -288,9 +367,11 @@ function renderFormationBuilder() {
     const fType = AppState.formationTypes[q];
     const fDef = FORMATION_POSITIONS[fType];
     const coords = PITCH_POS_COORDS[fType] || {};
+    const bench = document.getElementById('formation-bench');
 
     // 알 수 없는 포메이션 타입 방어 (데이터 손상/구버전 기록 대비)
     if (!fDef) {
+        if (bench) bench.innerHTML = '';
         container.innerHTML = `
       <div class="pitch-title">FC BARZA · ${escapeHtml(q)}</div>
       <p class="empty-hint" style="position:absolute;inset:32px 0 0;display:flex;align-items:center;justify-content:center;text-align:center;padding:1rem">
@@ -302,34 +383,49 @@ function renderFormationBuilder() {
     const fMap = AppState.formationState[q];
     const fSubs = AppState.formationSubs[q];
 
-    // 포지션별 선택 가능한 선수 옵션 (이미 다른 포지션/교체에 배정된 선수는 제외)
-    function buildOptions(pos, type) {
-        const current = type === 'main' ? (fMap[pos] || '-') : (fSubs[pos] || '-');
+    // ── 벤치 (현재 쿼터에 주전/교체로 배정되지 않은 참석자) ──
+    const assigned = new Set();
+    Object.values(fMap).forEach(n => { if (n && n !== '-') assigned.add(n); });
+    Object.values(fSubs).forEach(n => { if (n && n !== '-') assigned.add(n); });
+    const benchPlayers = AppState.attendees.filter(n => !assigned.has(n));
 
-        const assignedMainOther = new Set();
-        const assignedSubOther = new Set();
+    if (bench) {
+        const chips = benchPlayers.map(n => {
+            const part = getParticipation(n);
+            const pLabel = part ? `<em>${part % 1 === 0 ? part : part.toFixed(1)}Q</em>` : '';
+            const isGuest = AppState.roster[n] === 'Guest';
+            const sel = fbSelected && fbSelected.kind === 'bench' && fbSelected.name === n ? ' selected' : '';
+            return `<span class="bench-chip${isGuest ? ' is-guest' : ''}${sel}" data-name="${escapeHtml(n)}">${escapeHtml(n)}${pLabel}</span>`;
+        }).join('');
+        bench.innerHTML = `
+      <div class="bench-head">
+        <span class="bench-title">🪑 벤치 <span class="bench-count">${benchPlayers.length}</span></span>
+        <span class="bench-hint">칩을 포지션으로 드래그 · 또는 탭 → 포지션 탭</span>
+      </div>
+      <div class="bench-chips">${
+            AppState.attendees.length === 0
+                ? '<span class="empty-hint">참석자를 먼저 선택하세요.</span>'
+                : (chips || '<span class="empty-hint">모든 참석자가 배치되었습니다. ⚽</span>')
+        }</div>`;
+    }
+
+    // 교체 선수 드롭다운 옵션 (주전/교체로 이미 배정된 선수 제외)
+    function buildSubOptions(pos) {
+        const current = fSubs[pos] || '-';
+        const taken = new Set();
         for (const [p, player] of Object.entries(fMap)) {
-            if (p === pos) continue;
-            if (player && player !== '-') assignedMainOther.add(player);
-            const sub = fSubs[p];
-            if (sub && sub !== '-') assignedSubOther.add(sub);
+            if (player && player !== '-' && !(p === pos && false)) taken.add(player);
         }
-
-        const pool = AppState.attendees;
-        const opts = pool.filter(n => {
-            if (n === current) return true;
-            if (type === 'main') return !assignedMainOther.has(n) && !assignedSubOther.has(n);
-            return !assignedMainOther.has(n) && !assignedSubOther.has(n) && n !== (fMap[pos] || '');
-        });
-
-        // 라벨은 이름(+용병)만 — 좁은 셀에서도 읽기 쉽게 (출전수는 좌측 표/통계에서 확인)
+        for (const [p, s] of Object.entries(fSubs)) {
+            if (p === pos) continue;
+            if (s && s !== '-') taken.add(s);
+        }
+        const opts = AppState.attendees.filter(n => n === current || !taken.has(n));
         const optionHtml = opts.map(n => {
             const role = AppState.roster[n] === 'Guest' ? ' (용병)' : '';
             return `<option value="${escapeHtml(n)}" ${n === current ? 'selected' : ''}>${escapeHtml(n)}${role}</option>`;
         }).join('');
-
-        const noneLabel = type === 'main' ? '선택' : '교체 없음';
-        return `<option value="-" ${current === '-' ? 'selected' : ''}>${noneLabel}</option>${optionHtml}`;
+        return `<option value="-" ${current === '-' ? 'selected' : ''}>교체 없음</option>${optionHtml}`;
     }
 
     function buildPosCell(pos) {
@@ -337,13 +433,21 @@ function renderFormationBuilder() {
         const coord = coords[pos] || { left: 50, top: 50 };
         const rowKey = getPosRowKey(pos, fType);
         const hasSub = fSubs[pos] && fSubs[pos] !== '-';
-        const filled = fMap[pos] && fMap[pos] !== '-';
+        const player = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
+        const isGuest = player && AppState.roster[player] === 'Guest';
+        const sel = fbSelected && fbSelected.kind === 'pos' && fbSelected.pos === pos ? ' selected' : '';
+        const playerChip = player
+            ? `<div class="pos-player${isGuest ? ' is-guest' : ''}" data-pos="${escapeHtml(pos)}">
+                 <span class="pos-player-name">${escapeHtml(player)}</span>
+                 <button type="button" class="pos-clear" title="벤치로 보내기" aria-label="${escapeHtml(player)} 배치 해제">×</button>
+               </div>`
+            : `<div class="pos-player empty" data-pos="${escapeHtml(pos)}"><span class="pos-player-name">＋</span></div>`;
         return `
-      <div class="pos-cell ${filled ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
+      <div class="pos-cell ${player ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''}${sel}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
         <button type="button" class="pos-sub-toggle ${hasSub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정/해제" aria-label="교체 선수 지정">⇄</button>
         <div class="pos-badge pos-badge-${rowKey}">${escapeHtml(label)}</div>
-        <select class="pos-main-sel" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수">${buildOptions(pos, 'main')}</select>
-        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildOptions(pos, 'sub')}</select>
+        ${playerChip}
+        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildSubOptions(pos)}</select>
       </div>`;
     }
 
@@ -359,46 +463,14 @@ function renderFormationBuilder() {
     <div class="pitch-penalty-bottom"></div>
     ${positionsHtml}`;
 
-    // 특정 쿼터에서 선수가 포메이션에 배정되어 있는지 확인하는 헬퍼
-    function isPlayerInFormation(playerName, quarter) {
-        const fm = AppState.formationState[quarter];
-        const fs = AppState.formationSubs[quarter];
-        for (const p in fm) {
-            if (fm[p] === playerName && fm[p] !== '-') return true;
-            if (fs[p] === playerName && fs[p] !== '-') return true;
-        }
-        return false;
-    }
-
-    // 배정 변경 시 squadPlan 동기화 + 재렌더링 공통 처리
-    function applyAssignment(target, pos, val) {
-        const oldVal = target[pos];
-        target[pos] = val;
-        if (val !== '-') {
-            if (!AppState.squadPlan[val]) AppState.squadPlan[val] = {};
-            AppState.squadPlan[val][q] = true;
-        }
-        if (oldVal && oldVal !== '-' && oldVal !== val && !isPlayerInFormation(oldVal, q)) {
-            if (AppState.squadPlan[oldVal]) AppState.squadPlan[oldVal][q] = false;
-        }
-        renderFormationBuilder();
-        renderSquadTable();
-        renderPlaytimeStats();
-        renderFormationOverview();
-    }
-
-    // 이벤트 핸들러 — 선수 선택
-    container.querySelectorAll('.pos-main-sel').forEach(sel => {
-        sel.addEventListener('change', () => applyAssignment(AppState.formationState[q], sel.dataset.pos, sel.value));
-    });
-
-    // 이벤트 핸들러 — 교체 드롭다운
+    // ── 교체 컨트롤 ──
     container.querySelectorAll('.pos-sub-sel').forEach(sel => {
-        sel.addEventListener('change', () => applyAssignment(AppState.formationSubs[q], sel.dataset.pos, sel.value));
+        sel.addEventListener('change', () => fbApplySub(q, sel.dataset.pos, sel.value));
+        sel.addEventListener('pointerdown', e => e.stopPropagation());
     });
 
-    // 이벤트 핸들러 — 교체 토글 버튼 (체크박스 대체, 공간 절약)
     container.querySelectorAll('.pos-sub-toggle').forEach(btn => {
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
         btn.addEventListener('click', () => {
             const pos = btn.dataset.pos;
             const cell = btn.closest('.pos-cell');
@@ -409,9 +481,125 @@ function renderFormationBuilder() {
                 if (cell) cell.classList.add('has-sub');
                 if (subSel) { subSel.classList.add('show'); subSel.focus(); }
             } else {
-                // 끄면 교체 선수 초기화
-                applyAssignment(AppState.formationSubs[q], pos, '-');
+                fbApplySub(q, pos, '-'); // 끄면 교체 선수 초기화
             }
+        });
+    });
+
+    // ── 배치 해제 (×) ──
+    container.querySelectorAll('.pos-clear').forEach(btn => {
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            fbClearPos(q, btn.closest('.pos-cell').dataset.pos);
+        });
+    });
+
+    // ── 드래그 & 탭 인터랙션 ──
+    const DRAG_THRESHOLD = 7;
+
+    function handleTap(src) {
+        const fm = AppState.formationState[q];
+        if (src.kind === 'bench') {
+            if (fbSelected && fbSelected.kind === 'pos') { fbAssign(q, fbSelected.pos, src.name); return; }
+            fbSelected = (fbSelected && fbSelected.kind === 'bench' && fbSelected.name === src.name)
+                ? null : { kind: 'bench', name: src.name };
+            fbPaintSelection();
+        } else {
+            const occupant = fm[src.pos] && fm[src.pos] !== '-' ? fm[src.pos] : null;
+            if (fbSelected && fbSelected.kind === 'bench') { fbAssign(q, src.pos, fbSelected.name); return; }
+            if (fbSelected && fbSelected.kind === 'pos') {
+                if (fbSelected.pos === src.pos) { fbSelected = null; fbPaintSelection(); return; }
+                const selOcc = fm[fbSelected.pos] && fm[fbSelected.pos] !== '-' ? fm[fbSelected.pos] : null;
+                if (selOcc) { fbAssign(q, src.pos, selOcc); return; }      // 선택한 선수를 이 자리로 (스왑 포함)
+                if (occupant) { fbAssign(q, fbSelected.pos, occupant); return; } // 빈 선택 자리로 이 선수를
+            }
+            fbSelected = { kind: 'pos', pos: src.pos };
+            fbPaintSelection();
+        }
+    }
+
+    function startPress(e, src) {
+        if (e.button !== undefined && e.button !== 0) return;
+        const el = e.currentTarget;
+        const startX = e.clientX, startY = e.clientY;
+        let dragging = false, ghost = null, lastTarget = null, moved = false;
+
+        const onMove = ev => {
+            const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+            if (!dragging) {
+                if (dist < DRAG_THRESHOLD) return;
+                moved = true;
+                if (!src.canDrag) return; // 드래그 불가 소스는 탭만 취소
+                dragging = true;
+                ghost = document.createElement('div');
+                ghost.className = 'drag-ghost';
+                ghost.textContent = src.name;
+                document.body.appendChild(ghost);
+                (src.chipEl || el).classList.add('drag-src');
+            }
+            ghost.style.left = ev.clientX + 'px';
+            ghost.style.top = ev.clientY + 'px';
+            const under = document.elementFromPoint(ev.clientX, ev.clientY);
+            const target = (under && under.closest('.pos-cell')) || (under && under.closest('#formation-bench'));
+            if (lastTarget && lastTarget !== target) lastTarget.classList.remove('drop-hover');
+            if (target && target !== lastTarget) target.classList.add('drop-hover');
+            lastTarget = target;
+            ev.preventDefault();
+        };
+
+        const finish = () => {
+            el.removeEventListener('pointermove', onMove);
+            el.removeEventListener('pointerup', onUp);
+            el.removeEventListener('pointercancel', onCancel);
+            try { el.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+            if (ghost) ghost.remove();
+            if (lastTarget) lastTarget.classList.remove('drop-hover');
+            (src.chipEl || el).classList.remove('drag-src');
+        };
+
+        const onUp = ev => {
+            finish();
+            if (dragging) {
+                const under = document.elementFromPoint(ev.clientX, ev.clientY);
+                const cell = under && under.closest('.pos-cell');
+                const benchZone = under && under.closest('#formation-bench');
+                if (cell) fbAssign(q, cell.dataset.pos, src.name);
+                else if (benchZone && src.kind === 'pos') fbClearPos(q, src.pos);
+            } else if (!moved) {
+                handleTap(src);
+            }
+        };
+
+        const onCancel = () => finish();
+
+        try { el.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
+        el.addEventListener('pointermove', onMove);
+        el.addEventListener('pointerup', onUp);
+        el.addEventListener('pointercancel', onCancel);
+    }
+
+    // 벤치 칩: 드래그 소스 + 탭 선택
+    if (bench) {
+        bench.querySelectorAll('.bench-chip').forEach(chip => {
+            chip.addEventListener('pointerdown', e => {
+                startPress(e, { kind: 'bench', name: chip.dataset.name, canDrag: true, chipEl: chip });
+            });
+        });
+    }
+
+    // 포지션 카드: 채워진 칩은 드래그 소스, 카드 전체는 탭 타깃
+    container.querySelectorAll('.pos-cell').forEach(cell => {
+        cell.addEventListener('pointerdown', e => {
+            if (e.target.closest('.pos-sub-toggle, .pos-sub-sel, .pos-clear')) return;
+            const pos = cell.dataset.pos;
+            const occupant = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
+            const onChip = !!e.target.closest('.pos-player:not(.empty)');
+            startPress(e, {
+                kind: 'pos', pos, name: occupant,
+                canDrag: !!(occupant && onChip),
+                chipEl: cell.querySelector('.pos-player'),
+            });
         });
     });
 }
@@ -766,6 +954,7 @@ function initTab1Events() {
         document.querySelectorAll('.qbtn').forEach(b => b.classList.toggle('active', b.dataset.q === AppState.currentQuarter));
         // 포메이션 타입 셀렉트 동기화
         document.getElementById('formation-type-select').value = AppState.formationTypes[AppState.currentQuarter];
+        fbClearSelection();
         renderFormationBuilder();
     });
 
@@ -777,6 +966,7 @@ function initTab1Events() {
         // 해당 쿼터 배치 초기화
         AppState.formationState[q] = {};
         AppState.formationSubs[q] = {};
+        fbClearSelection();
         renderFormationBuilder();
     });
 
