@@ -81,10 +81,13 @@
 
     /**
      * 목표/균형 지표
-     * @param {Object} opts { quarters, attendees, quarterCount, onFieldSize }
+     * @param {Object} opts { quarters, attendees, quarterCount, onFieldSize, availability }
+     *   availability: { name: ['1Q','2Q','3Q'] } — 일부 쿼터만 참석하는 선수 (없으면 전 쿼터)
+     *   개인 목표 = 총 슬롯 × (본인 가능 쿼터 ÷ 전원 가능 쿼터 합). 전원 전 쿼터면 slots/N 과 같다.
      * @returns {Object} {
-     *   quarterKeys, attendees, slots, target, perQuarter:{q:n}, actualSlots,
-     *   participation, avg, min, max, spread, under:[], over:[], unplayed:[], balanced
+     *   quarterKeys, attendees, slots, target, personalTarget:{name:t}, availableCount:{name:n},
+     *   perQuarter:{q:n}, actualSlots, participation, avg, min, max, spread,
+     *   under:[], over:[], unplayed:[], balanced
      * }
      */
     function computeTargets(opts) {
@@ -105,6 +108,15 @@
 
         const slots = onFieldSize * quarterCount;
         const target = attendees.length ? slots / attendees.length : 0;
+        const availability = (opts && opts.availability) || {};
+        const availableCount = {};
+        attendees.forEach(n => {
+            const av = availability[n];
+            availableCount[n] = Array.isArray(av) ? av.filter(q => keys.includes(q)).length : quarterCount;
+        });
+        const availSum = attendees.reduce((s, n) => s + availableCount[n], 0);
+        const personalTarget = {};
+        attendees.forEach(n => { personalTarget[n] = availSum ? slots * availableCount[n] / availSum : 0; });
         const credits = attendees.map(n => (participation[n] ? participation[n].credit : 0));
         const played = credits.filter(c => c > 0);
         const avg = played.length ? played.reduce((a, b) => a + b, 0) / played.length : 0;
@@ -115,7 +127,7 @@
         const under = [], over = [], unplayed = [];
         attendees.forEach(n => {
             const c = participation[n] ? participation[n].credit : 0;
-            const s = participationStatus(c, target);
+            const s = participationStatus(c, personalTarget[n]);
             status[n] = s;
             if (c === 0) unplayed.push(n);
             else if (s === 'under') under.push(n);
@@ -124,7 +136,7 @@
 
         return {
             quarterKeys: keys, quarterCount, onFieldSize,
-            attendees: attendees.length, slots, actualSlots, target, perQuarter,
+            attendees: attendees.length, slots, actualSlots, target, personalTarget, availableCount, perQuarter,
             participation, status, avg, min, max, spread: max - min,
             under, over, unplayed,
             balanced: (max - min) < 2,

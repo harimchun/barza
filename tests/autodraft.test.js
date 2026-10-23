@@ -42,9 +42,9 @@ test('hungarianMax: 최대 가중 매칭 (정사각·직사각)', () => {
     assert.deepEqual(c, [1, 0]);
 });
 
-test('generate: 14명 4쿼터 11명 → 모두 3~4쿼터, 매 쿼터 11명 중복 없음', () => {
+test('generate: 14명 4쿼터 11명 (교체 없이) → 모두 3~4쿼터, 매 쿼터 11명 중복 없음', () => {
     const r = AutoDraft.generate({ attendees: ATTENDEES_14, positions: POSITIONS, quarterCount: 4, onFieldSize: 11,
-        formations: {}, defaultFormation: '4-2-3-1', formationSlots: FORMATION_SLOTS, seed: 7 });
+        formations: {}, defaultFormation: '4-2-3-1', formationSlots: FORMATION_SLOTS, seed: 7, allowSubs: false });
     const credits = Object.values(r.credits);
     assert.equal(credits.length, 14);
     assert.equal(credits.reduce((a, b) => a + b, 0), 44);
@@ -119,4 +119,48 @@ test('reasonLabel', () => {
     assert.equal(AutoDraft.reasonLabel({ reason: 'exact', rank: 1 }), '2순위');
     assert.equal(AutoDraft.reasonLabel({ reason: 'locked' }), '🔒 고정');
     assert.equal(AutoDraft.reasonLabel({ reason: 'none' }), '대체');
+});
+
+const GUEST_POS = { ...POSITIONS, 용병A: ['CM'], 용병B: ['ST'], 용병C: ['CB'] };
+const ATT_15 = [...ATTENDEES_14.slice(0, 12), '용병A', '용병B', '용병C'];
+
+test('generate: 용병 최소 3쿼터 보장', () => {
+    const r = AutoDraft.generate({ attendees: ATT_15, positions: GUEST_POS, quarterCount: 4, onFieldSize: 11,
+        defaultFormation: '4-2-3-1', formationSlots: FORMATION_SLOTS, seed: 4, allowSubs: false,
+        minCredits: { 용병A: 3, 용병B: 3, 용병C: 3 } });
+    for (const g of ['용병A', '용병B', '용병C']) assert.ok(r.credits[g] >= 3, `${g} ${r.credits[g]}`);
+    assert.equal(Object.values(r.credits).reduce((a, b) => a + b, 0), 44);
+    assert.equal(r.warnings.filter(w => w.includes('보장')).length, 0);
+});
+
+test('generate: 교체로 0.5 보정 → 최대-최소 차이가 1 미만', () => {
+    // 15명 × 44슬롯: 정수로는 2/3/4 가 섞이지만 교체를 쓰면 2.5~3.5 안으로
+    const r = AutoDraft.generate({ attendees: ATT_15, positions: GUEST_POS, quarterCount: 4, onFieldSize: 11,
+        defaultFormation: '4-2-3-1', formationSlots: FORMATION_SLOTS, seed: 4, allowSubs: true });
+    const vals = Object.values(r.credits);
+    assert.ok(Math.max(...vals) - Math.min(...vals) < 1, `spread ${Math.max(...vals) - Math.min(...vals)}`);
+    assert.ok(r.subCount > 0);
+    // 교체 쌍 유효성: in 은 그 쿼터 벤치, out 은 라인업의 해당 슬롯, 합계는 여전히 44
+    for (const q of ['1Q', '2Q', '3Q', '4Q']) {
+        const qd = r.quarters[q];
+        for (const sb of qd.subs) {
+            assert.equal(qd.lineup[sb.pos], sb.out, `${q} ${sb.pos}`);
+            assert.ok(!Object.values(qd.lineup).includes(sb.in), `${q} in on field`);
+            assert.notEqual(sb.pos, 'GK');
+        }
+    }
+    assert.ok(Math.abs(vals.reduce((a, b) => a + b, 0) - 44) < 1e-9);
+    // 교체를 반영한 크레딧이 Quota 엔진 계산과 일치
+    const Quota = require('../js/quota.js');
+    const p = Quota.computeParticipation(r.quarters);
+    for (const n of ATT_15) assert.equal(p[n] ? p[n].credit : 0, r.credits[n], n);
+});
+
+test('generate: 출전 불가 쿼터 선수는 교체로도 투입되지 않음', () => {
+    const r = AutoDraft.generate({ attendees: ATT_15, positions: GUEST_POS, quarterCount: 4, onFieldSize: 11,
+        defaultFormation: '4-2-3-1', formationSlots: FORMATION_SLOTS, seed: 2, allowSubs: true,
+        unavailable: { 우성: ['4Q'], 형록: ['3Q', '4Q'] } });
+    const q4 = r.quarters['4Q'];
+    assert.ok(!Object.values(q4.lineup).includes('우성') && !q4.subs.some(s => s.in === '우성' || s.out === '우성'));
+    assert.ok(!Object.values(r.quarters['3Q'].lineup).includes('형록') && !r.quarters['3Q'].subs.some(s => s.in === '형록'));
 });

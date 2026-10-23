@@ -110,6 +110,8 @@ function renderMatchDetail(match) {
   const benchOnly = [...names].filter(n => !(credits[n] > 0));
   const squadRows = played.map(n => {
     const qCells = quarters.map(q => {
+      const av = (match.availability || {})[n];
+      if (Array.isArray(av) && !av.includes(q)) return `<td class="check-away" title="불참 쿼터">×</td>`;
       const qd = (match.quarters || {})[q] || {};
       const c = quarterCredit(qd.lineup, qd.subs, n);
       const mark = c >= 1 ? '●' : c > 0 ? '◐' : '';

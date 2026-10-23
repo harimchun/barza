@@ -104,8 +104,10 @@ function renderFormationOverview() {
             return `<div class="qs-line"><span class="qs-line-key qs-${row.key}">${row.key.toUpperCase()}</span>${names.map(escapeHtml).join(' · ')}</div>`;
         }).reverse().join('') : '';
         const subHtml = subs.length ? `<div class="qs-subs">⇄ ${subs.map(sb => `${escapeHtml(sb.in || '?')}→${escapeHtml(sb.out || '?')}`).join(', ')}</div>` : '';
-        const bench = AppState.attendees.filter(x => !Object.values(lineup).includes(x) && !subs.some(sb => sb.in === x));
-        const benchHtml = bench.length ? `<div class="qs-bench">벤치 ${bench.map(escapeHtml).join(', ')}</div>` : '';
+        const bench = AppState.attendees.filter(x => !Object.values(lineup).includes(x) && !subs.some(sb => sb.in === x) && playerAvailable(x, q));
+        const away = AppState.attendees.filter(x => !playerAvailable(x, q));
+        const benchHtml = (bench.length ? `<div class="qs-bench">벤치 ${bench.map(escapeHtml).join(', ')}</div>` : '')
+            + (away.length ? `<div class="qs-bench">불참 ${away.map(escapeHtml).join(', ')}</div>` : '');
         const short = t && n < t.onFieldSize ? `<span class="qs-warn">${n}/${t.onFieldSize}</span>` : `<span class="qs-count">${n}명</span>`;
         return `
           <button type="button" class="qs-card ${q === AppState.currentQuarter ? 'active' : ''}" data-q="${q}">
@@ -133,18 +135,30 @@ function renderPlayerChecklist() {
     // 멤버는 최근 참석순(같으면 이름순)
     const members = [...groups.members].sort((a, b) => (lastSeen[b] || '').localeCompare(lastSeen[a] || '') || a.localeCompare(b, 'ko'));
 
+    const editingAvail = AppState.availabilityEditing;
     const item = (name) => {
-        const checked = AppState.attendees.includes(name) ? 'checked' : '';
+        const isChecked = AppState.attendees.includes(name);
         const guest = isGuest(name);
         const safe = escapeHtml(name);
         const p = getPlayer(name) || {};
         const pos = (p.positions || []).slice(0, 2).join('·');
         const seen = lastSeen[name] ? `<em>${escapeHtml(lastSeen[name].slice(5))}</em>` : '';
+        const availLabel = availabilityLabel(name);
+        const availBtn = isChecked
+            ? `<button type="button" class="avail-btn ${availLabel ? 'partial' : ''}" data-name="${safe}" title="참석 가능한 쿼터 설정 (일찍 가거나 늦게 오는 경우)">${availLabel ? escapeHtml(availLabel) : '전 쿼터'}</button>`
+            : '';
+        const toggles = (isChecked && editingAvail === name)
+            ? `<div class="avail-toggles" data-name="${safe}">
+                ${editorQuarters().map(q => `<button type="button" class="avail-q ${playerAvailable(name, q) ? 'on' : ''}" data-q="${q}">${q}</button>`).join('')}
+                <button type="button" class="avail-done">완료</button>
+               </div>` : '';
         return `
-      <label class="player-check-item ${guest ? 'is-guest' : ''}">
-        <input type="checkbox" class="player-cb" data-name="${safe}" ${checked}>
-        <span>${safe}${pos ? ` <small class="pos-hint">${escapeHtml(pos)}</small>` : ''}${seen}</span>
-      </label>`;
+      <div class="player-check-row ${editingAvail === name ? 'editing' : ''}">
+        <label class="player-check-item ${guest ? 'is-guest' : ''}">
+          <input type="checkbox" class="player-cb" data-name="${safe}" ${isChecked ? 'checked' : ''}>
+          <span>${safe}${pos ? ` <small class="pos-hint">${escapeHtml(pos)}</small>` : ''}${seen}</span>
+        </label>${availBtn}${toggles}
+      </div>`;
     };
 
     const checkedGuests = guests.filter(n => AppState.attendees.includes(n)).length;
@@ -171,7 +185,10 @@ function renderPlayerChecklist() {
                 if (!AppState.attendees.includes(name)) AppState.attendees.push(name);
             } else {
                 AppState.attendees = AppState.attendees.filter(n => n !== name);
+                delete AppState.availability[name];
+                if (AppState.availabilityEditing === name) AppState.availabilityEditing = null;
             }
+            renderPlayerChecklist();
             renderSquadTable();
             renderPlaytimeStats();
             renderLiveRecorder();
@@ -179,6 +196,32 @@ function renderPlayerChecklist() {
             renderFormationOverview();
             renderMatchSummary();
         });
+    });
+    // 참석 쿼터 설정 (일찍 가는/늦게 오는 선수)
+    container.querySelectorAll('.avail-btn').forEach(btn => btn.addEventListener('click', () => {
+        AppState.availabilityEditing = AppState.availabilityEditing === btn.dataset.name ? null : btn.dataset.name;
+        renderPlayerChecklist();
+    }));
+    container.querySelectorAll('.avail-toggles').forEach(box => {
+        const name = box.dataset.name;
+        box.querySelectorAll('.avail-q').forEach(b => b.addEventListener('click', () => {
+            const q = b.dataset.q;
+            const cur = playerQuarters(name);
+            const next = cur.includes(q) ? cur.filter(x => x !== q) : [...cur, q];
+            if (next.length === 0) { showToast('최소 한 쿼터는 참석해야 합니다. 아예 불참이면 체크를 해제하세요.', 'error'); return; }
+            setPlayerQuarters(name, next);
+            // 불참 쿼터에 배치돼 있으면 빼기
+            editorQuarters().forEach(qq => {
+                if (playerAvailable(name, qq)) return;
+                const fMap = AppState.formationState[qq] || {};
+                Object.keys(fMap).forEach(pos => { if (fMap[pos] === name) delete fMap[pos]; });
+                const fSubs = AppState.formationSubs[qq] || {};
+                Object.keys(fSubs).forEach(pos => { if (fSubs[pos] === name) delete fSubs[pos]; });
+            });
+            renderPlayerChecklist();
+            fbRefresh();
+        }));
+        box.querySelector('.avail-done').addEventListener('click', () => { AppState.availabilityEditing = null; renderPlayerChecklist(); });
     });
 
     const applyFilter = (kw) => {
@@ -221,13 +264,16 @@ function renderSquadTable() {
         .map(name => {
             const p = t.participation[name] || { credit: 0, byQuarter: {} };
             const qCells = qs.map(q => {
+                if (!playerAvailable(name, q)) return `<td class="check-away" title="불참 쿼터">×</td>`;
                 const c = p.byQuarter[q] || 0;
                 const mark = c >= 1 ? '●' : c > 0 ? '◐' : '';
                 return `<td class="${c > 0 ? 'check-yes' : 'check-no'}" title="${c}">${mark}</td>`;
             }).join('');
-            const diff = p.credit - t.target;
+            const myTarget = t.personalTarget[name] != null ? t.personalTarget[name] : t.target;
+            const diff = p.credit - myTarget;
             const st = p.credit === 0 ? 'unplayed' : t.status[name];
-            const diffStr = p.credit === 0 ? '미출전' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}`;
+            const partial = Math.abs(myTarget - t.target) > 1e-9 ? ` <small class="my-target">목표 ${fmtQ(myTarget)}</small>` : '';
+            const diffStr = p.credit === 0 ? '미출전' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}${partial}`;
             return `<tr class="squad-row-${st}">
       <td class="squad-name">${escapeHtml(formatPlayerName(name))}</td>
       ${qCells}
@@ -408,7 +454,8 @@ function renderFormationBuilder() {
     Object.values(fMap).forEach(n => { if (n && n !== '-') assigned.add(n); });
     Object.values(fSubs).forEach(n => { if (n && n !== '-') assigned.add(n); });
     extra.forEach(sb => { if (sb.in) assigned.add(sb.in); if (sb.out) assigned.add(sb.out); });
-    const benchPlayers = AppState.attendees.filter(n => !assigned.has(n));
+    const benchPlayers = AppState.attendees.filter(n => !assigned.has(n) && playerAvailable(n, q));
+    const awayPlayers = AppState.attendees.filter(n => !assigned.has(n) && !playerAvailable(n, q));
 
     if (bench) {
         const chips = benchPlayers.map(n => {
@@ -430,7 +477,7 @@ function renderFormationBuilder() {
             AppState.attendees.length === 0
                 ? '<span class="empty-hint">참석자를 먼저 체크하세요.</span>'
                 : (chips || '<span class="empty-hint">모두 배치됐습니다.</span>')
-        }</div>${extraHtml}`;
+        }</div>${awayPlayers.length ? `<div class="bench-away">이번 쿼터 불참: ${awayPlayers.map(n => `<span>${escapeHtml(n)} <small>${escapeHtml(availabilityLabel(n))}</small></span>`).join(' ')}</div>` : ''}${extraHtml}`;
         bench.querySelectorAll('.bench-chip').forEach(chip => chip.addEventListener('click', () => {
             if (!checkEditorAccess()) return;
             AppState.pendingPick = AppState.pendingPick === chip.dataset.name ? null : chip.dataset.name;
@@ -583,7 +630,8 @@ function openPickSheet(q, pos, mode) {
     const t = AppState.attendees.length ? editorTargets() : null;
     const assignedMain = new Set(Object.values(fMap).filter(Boolean));
     const assignedSub = new Set(Object.values(fSubs).filter(Boolean));
-    const benchNames = AppState.attendees.filter(n => !assignedMain.has(n) && !assignedSub.has(n));
+    const benchNames = AppState.attendees.filter(n => !assignedMain.has(n) && !assignedSub.has(n) && playerAvailable(n, q));
+    const awayNames = AppState.attendees.filter(n => !assignedMain.has(n) && !assignedSub.has(n) && !playerAvailable(n, q));
     const prefs = n => ((getPlayer(n) || {}).positions || []);
     const fit = n => AutoDraft.fitDetail(prefs(n), pos);
     const sortByFit = names => [...names].sort((a, b) => fit(b).score - fit(a).score || ((t && t.participation[a]) ? t.participation[a].credit : 0) - ((t && t.participation[b]) ? t.participation[b].credit : 0) || a.localeCompare(b, 'ko'));
@@ -607,7 +655,8 @@ function openPickSheet(q, pos, mode) {
         <button type="button" class="pick-close" data-close="1" aria-label="닫기">✕</button>
       </div>`;
     html += `<div class="pick-section"><div class="pick-section-title">벤치 <small>${benchNames.length}명 · 적합도순</small></div>
-        <div class="pick-list">${sortByFit(benchNames).map(n => chip(n)).join('') || '<span class="empty-hint">벤치에 선수가 없습니다.</span>'}</div></div>`;
+        <div class="pick-list">${sortByFit(benchNames).map(n => chip(n)).join('') || '<span class="empty-hint">벤치에 선수가 없습니다.</span>'}</div>
+        ${awayNames.length ? `<div class="hint-text" style="margin-top:0.3rem">이번 쿼터 불참: ${awayNames.map(escapeHtml).join(', ')}</div>` : ''}</div>`;
     if (mode === 'main') {
         const others = Object.entries(fMap).filter(([p, n]) => n && p !== pos);
         if (others.length) {
@@ -644,6 +693,8 @@ function openPickSheet(q, pos, mode) {
 }
 
 // ── 자동 초안 (선호 포지션 + 쿼터 균형) ──────────────────────────────────
+const GUEST_MIN_QUARTERS = 3; // 용병 최소 보장 쿼터
+
 function runAutoDraft() {
     if (!checkEditorAccess()) return;
     if (AppState.attendees.length === 0) { showToast('참석자를 먼저 선택하세요.', 'error'); return; }
@@ -665,22 +716,31 @@ function runAutoDraft() {
             if (n && n !== '-') locks[q][pos] = n;
         });
     });
+    const unavailable = {};
+    const minCredits = {};
+    AppState.attendees.forEach(n => {
+        const away = qs.filter(q => !playerAvailable(n, q));
+        if (away.length) unavailable[n] = away;
+        if (isGuest(n)) minCredits[n] = Math.min(GUEST_MIN_QUARTERS, playerQuarters(n).length);
+    });
     AppState.draftSeed += 1;
     const result = AutoDraft.generate({
         attendees: AppState.attendees, positions,
         quarterCount: AppState.quarterCount, onFieldSize: AppState.onFieldSize,
-        formations: AppState.formationTypes, formationSlots, locks,
+        formations: AppState.formationTypes, formationSlots, locks, unavailable, minCredits,
+        allowSubs: true,
         seed: AppState.draftSeed * 7919 + AppState.attendees.length,
     });
     qs.forEach(q => {
         AppState.formationState[q] = { ...result.quarters[q].lineup };
         AppState.formationSubs[q] = {};
+        (result.quarters[q].subs || []).forEach(sb => { if (sb.pos && sb.in) AppState.formationSubs[q][sb.pos] = sb.in; });
         AppState.extraSubs[q] = [];
         AppState.draftReasons[q] = result.quarters[q].reasons;
     });
     fbRefresh();
     const t = editorTargets();
-    const msg = `✨ 초안 ${AppState.draftSeed}번째 · 목표 ${fmtQ(t.target)}Q · 실제 ${fmtQ(t.min)}~${fmtQ(t.max)}Q`;
+    const msg = `✨ 초안 ${AppState.draftSeed}번째 · 목표 ${fmtQ(t.target)}Q · 실제 ${fmtQ(t.min)}~${fmtQ(t.max)}Q${result.subCount ? ` · 교체 ${result.subCount}건` : ''}`;
     showToast(msg, result.warnings.length ? 'error' : 'success');
     result.warnings.forEach(w => showToast('⚠️ ' + w, 'error'));
 }
@@ -1156,6 +1216,7 @@ function buildMatchRecord(id, isDraft) {
         quarterCount: Object.keys(quarters).length,
         onFieldSize: AppState.onFieldSize || Quota.DEFAULT_ON_FIELD,
         attendees: [...AppState.attendees],
+        availability: Object.fromEntries(Object.entries(AppState.availability || {}).filter(([n]) => AppState.attendees.includes(n))),
         quarters,
         scores,
         scoresKnown: true,
@@ -1255,6 +1316,8 @@ function loadMatchToEditor(record) {
     AppState.onFieldSize = record.onFieldSize || Quota.DEFAULT_ON_FIELD;
     ensureQuarterState();
     AppState.attendees = [...allNames].filter(Boolean);
+    AppState.availability = {};
+    Object.entries(record.availability || {}).forEach(([n, qsAv]) => { if (Array.isArray(qsAv) && AppState.attendees.includes(n)) AppState.availability[n] = [...qsAv]; });
     AppState.editModeId = record.id;
     AppState.editingExtras = {
         type: record.type, timeSlot: record.timeSlot, notes: record.notes, source: record.source,

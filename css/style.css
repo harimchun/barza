@@ -2720,3 +2720,28 @@ body.sheet-open { overflow: hidden; }
   .attend-tools .guest-add-row #guest-name-input { flex: 1 1 35%; }
   .attend-tools .guest-add-row #guest-pos-input { flex: 1 1 40%; }
 }
+#step-squad .squad-details { margin-top: 0; border: none; padding: 0; }
+#step-squad .squad-details > summary { font-size: 0.98rem; }
+#step-squad .squad-details > summary::before { content: none; }
+#step-squad .squad-details > summary .step-num { font-size: 0.6rem; }
+#step-squad .squad-details[open] > summary { margin-bottom: 0.7rem; }
+
+/* ── 참석 가능 쿼터 (일찍 가는/늦게 오는 선수) ── */
+.player-check-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.2rem 0.4rem; }
+.player-check-row .player-check-item { flex: 1 1 auto; }
+.avail-btn {
+  font: inherit; font-size: 0.62rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--text-muted); border: 1px dashed var(--border); white-space: nowrap; opacity: 0.7;
+}
+.player-check-row:hover .avail-btn, .avail-btn.partial { opacity: 1; }
+.avail-btn.partial { background: rgba(237, 187, 0, 0.14); color: var(--gold); border: 1px solid rgba(237, 187, 0, 0.45); }
+.avail-toggles { flex: 1 1 100%; display: flex; gap: 0.3rem; align-items: center; padding: 0.25rem 0 0.35rem 1.6rem; }
+.avail-q { font: inherit; font-size: 0.72rem; font-weight: 700; min-width: 36px; min-height: 28px; border-radius: 6px; cursor: pointer;
+  background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+.avail-q.on { background: var(--burgundy); color: #fff; border-color: var(--burgundy); }
+.avail-done { font: inherit; font-size: 0.7rem; margin-left: auto; padding: 0.2rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.player-check-row.editing { background: rgba(255,255,255,0.03); border-radius: 6px; }
+.bench-away { margin-top: 0.4rem; font-size: 0.74rem; color: var(--text-muted); }
+.bench-away span { margin-right: 0.4rem; } .bench-away small { color: var(--gold); }
+.check-away { color: var(--text-muted); opacity: 0.6; text-align: center; }
+.my-target { display: block; font-size: 0.6rem; color: var(--text-muted); font-weight: 400; }

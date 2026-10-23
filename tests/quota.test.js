@@ -104,3 +104,20 @@ test('quarterKeys: 기본 4, 잘못된 값은 4로', () => {
     assert.deepEqual(Quota.quarterKeys(undefined), ['1Q', '2Q', '3Q', '4Q']);
     assert.deepEqual(Quota.quarterKeys(5).length, 5);
 });
+
+test('computeTargets: 일부 쿼터만 참석하는 선수는 개인 목표가 비율로 줄고 나머지는 늘어남', () => {
+    const attendees = Array.from({ length: 12 }, (_, i) => `p${i}`);
+    const t = Quota.computeTargets({ quarters: {}, attendees, quarterCount: 4, onFieldSize: 11,
+        availability: { p0: ['1Q', '2Q'], p1: ['1Q', '2Q', '3Q'] } });
+    assert.equal(t.availableCount.p0, 2);
+    assert.equal(t.availableCount.p1, 3);
+    assert.equal(t.availableCount.p2, 4);
+    // 가능 쿼터 합 = 2 + 3 + 10×4 = 45, 슬롯 44 → p0: 44×2/45, p2: 44×4/45
+    assert.ok(Math.abs(t.personalTarget.p0 - 44 * 2 / 45) < 1e-9);
+    assert.ok(Math.abs(t.personalTarget.p2 - 44 * 4 / 45) < 1e-9);
+    const sum = Object.values(t.personalTarget).reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sum - 44) < 1e-9);
+    // 전원 전 쿼터면 기존과 동일
+    const t2 = Quota.computeTargets({ quarters: {}, attendees, quarterCount: 4, onFieldSize: 11 });
+    assert.ok(Object.values(t2.personalTarget).every(v => Math.abs(v - 44 / 12) < 1e-9));
+});

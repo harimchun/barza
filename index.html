@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=20261024f">
+  <link rel="stylesheet" href="css/style.css?v=20261024h">
 
   <!-- Firebase SDK (익명 인증 — DB 쓰기 권한 확보용) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -131,6 +131,14 @@
               <p class="empty-hint" style="padding:0.5rem">명단을 불러오는 중...</p>
             </div>
           </section>
+
+          <section class="card step-card" id="step-squad">
+            <details class="squad-details" id="squad-details" open>
+              <summary><span class="step-title" style="margin:0"><span class="step-num">1.5</span>출전 현황</span><span id="squad-summary-text" class="step-summary"></span></summary>
+              <div id="playtime-stats"></div>
+              <div id="squad-table-container"><p class="empty-hint">참석자를 선택하세요.</p></div>
+            </details>
+          </section>
         </div>
 
         <!-- 2. 배치 -->
@@ -162,12 +170,6 @@
             <div id="formation-bench" class="formation-bench"></div>
 
             <div id="formation-builder"></div>
-
-            <details class="squad-details" id="squad-details">
-              <summary><span>출전 현황</span><span id="squad-summary-text" class="step-summary"></span></summary>
-              <div id="playtime-stats"></div>
-              <div id="squad-table-container"><p class="empty-hint">참석자를 선택하세요.</p></div>
-            </details>
 
             <div class="quarter-strip-head">
               <span class="quarter-strip-title">전체 쿼터 요약</span>
@@ -245,16 +247,16 @@
   <div id="toast-container"></div>
 
   <!-- ========== SCRIPTS ========== -->
-  <script src="js/config.js?v=20261024f"></script>
-  <script src="js/quota.js?v=20261024f"></script>
-  <script src="js/autodraft.js?v=20261024f"></script>
-  <script src="js/app.js?v=20261024f"></script>
-  <script src="js/drive.js?v=20261024f"></script>
-  <script src="js/formation.js?v=20261024f"></script>
-  <script src="js/tab1_match.js?v=20261024f"></script>
-  <script src="js/tab2_stats.js?v=20261024f"></script>
-  <script src="js/tab3_history.js?v=20261024f"></script>
-  <script src="js/tab4_roster.js?v=20261024f"></script>
+  <script src="js/config.js?v=20261024h"></script>
+  <script src="js/quota.js?v=20261024h"></script>
+  <script src="js/autodraft.js?v=20261024h"></script>
+  <script src="js/app.js?v=20261024h"></script>
+  <script src="js/drive.js?v=20261024h"></script>
+  <script src="js/formation.js?v=20261024h"></script>
+  <script src="js/tab1_match.js?v=20261024h"></script>
+  <script src="js/tab2_stats.js?v=20261024h"></script>
+  <script src="js/tab3_history.js?v=20261024h"></script>
+  <script src="js/tab4_roster.js?v=20261024h"></script>
 
 </body>
 

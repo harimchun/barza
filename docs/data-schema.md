@@ -46,6 +46,7 @@ emailKey = 소문자 이메일의 '.' 을 ',' 로 바꾼 값 (Firebase 키 제�
   "quarterCount": 4,             // 4 또는 5
   "onFieldSize": 11,             // 쿼터당 출전 인원 (목표 쿼터 계산용)
   "attendees": ["우성", "형록", "..."],
+  "availability": { "우성": ["1Q", "2Q", "3Q"] },   // 일부 쿼터만 참석하는 선수 (없으면 전 쿼터). 개인 목표 = 슬롯 × 가능 쿼터 ÷ 전원 가능 쿼터 합
   "quarters": {
     "1Q": {
       "formation": "4-2-3-1",

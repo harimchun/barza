@@ -215,8 +215,11 @@
      *   formationSlots: { '4-2-3-1': ['ST', ...] }  포메이션별 슬롯 키 목록
      *   locks: { q: { pos: name } }            고정 배치
      *   unavailable: { name: ['1Q'] }          출전 불가 쿼터
+     *   minCredits: { name: 3 }                 최소 보장 쿼터 (예: 용병 3쿼터)
+     *   allowSubs: boolean                      정수 쿼터로 균형이 안 맞으면 교체 쌍(0.5)으로 보정 (기본 true)
+     *   maxSubsPerQuarter: number               쿼터당 교체 상한 (기본 3)
      *   seed: number
-     * @returns {Object} { quarters: { q: { formation, lineup, reasons } }, credits, target, bench: { q: [] }, warnings: [] }
+     * @returns {Object} { quarters: { q: { formation, lineup, subs, reasons } }, credits, target, bench: { q: [] }, subCount, warnings: [] }
      */
     function generate(opts) {
         const attendees = [...new Set(opts.attendees || [])];
@@ -226,6 +229,9 @@
         const quarters = Array.from({ length: quarterCount }, (_, i) => `${i + 1}Q`);
         const locks = opts.locks || {};
         const unavailable = opts.unavailable || {};
+        const minCredits = opts.minCredits || {};
+        const allowSubs = opts.allowSubs !== false;
+        const maxSubsPerQuarter = opts.maxSubsPerQuarter || 3;
         const seed = opts.seed || 1;
         const warnings = [];
 
@@ -259,12 +265,17 @@
             const chosen = new Set(Object.values(lineup));
             const need = Math.min(slots.length, available.length) - chosen.size;
             const pool = available.filter(n => !chosen.has(n));
-            const sortKey = n => [credits[n], benchedLast[n] ? 0 : 1, rankOf[n]];
+            const remaining = quarterCount - qi; // 이번 쿼터 포함 남은 쿼터 수
+            // 최소 보장: 남은 쿼터를 다 뛰어야 겨우 채우는 선수는 강제 투입
+            const mustPlay = n => Math.max(0, (minCredits[n] || 0) - credits[n]) >= remaining;
+            const sortKey = n => [mustPlay(n) ? 0 : 1, credits[n], benchedLast[n] ? 0 : 1, rankOf[n]];
             pool.sort((a, b) => {
                 const ka = sortKey(a), kb = sortKey(b);
                 for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
                 return 0;
             });
+            const forced = pool.filter(mustPlay).length;
+            if (forced > Math.max(0, need)) warnings.push(`${q}: 최소 보장 쿼터를 채워야 하는 선수가 ${forced}명이라 자리(${Math.max(0, need)})가 모자랍니다.`);
             const picked = pool.slice(0, Math.max(0, need));
 
             // GK 보장: 선택된 인원 중 GK 가능 선수가 없고 풀에 있으면 교체
@@ -275,7 +286,7 @@
                 if (gkCand) {
                     // 선택된 선수 중 크레딧이 가장 높은 비GK를 빼고 GK 투입
                     let out = -1;
-                    for (let i = picked.length - 1; i >= 0; i--) { if (!isGK(picked[i])) { out = i; break; } }
+                    for (let i = picked.length - 1; i >= 0; i--) { if (!isGK(picked[i]) && !mustPlay(picked[i])) { out = i; break; } }
                     if (out >= 0) picked[out] = gkCand;
                 } else if (!available.some(isGK)) {
                     warnings.push(`${q}: GK 선호 선수가 없어 적합도만으로 GK를 배정했습니다.`);
@@ -305,9 +316,47 @@
                 if (onField.has(n)) credits[n] += 1;
                 benchedLast[n] = !onField.has(n);
             });
-            result.quarters[q] = { formation, lineup, reasons };
+            result.quarters[q] = { formation, lineup, subs: [], reasons };
             result.bench[q] = attendees.filter(n => !onField.has(n));
             prevLineup = lineup;
+        });
+
+        // 5) 교체로 0.5 단위 보정: 벤치(낮은 크레딧) ↔ 필드(높은 크레딧) 차이가 1 이상이면 교체 쌍 생성
+        let subCount = 0;
+        if (allowSubs) {
+            const isGK = n => (positions[n] || []).some(c => (parsePref(c) || {}).line === 'GK');
+            for (let qi = quarters.length - 1; qi >= 0; qi--) {
+                const q = quarters[qi];
+                const qd = result.quarters[q];
+                const qLocks = locks[q] || {};
+                let made = 0;
+                while (made < maxSubsPerQuarter) {
+                    const benchers = attendees
+                        .filter(n => !Object.values(qd.lineup).includes(n) && !(unavailable[n] || []).includes(q)
+                            && !qd.subs.some(sb => sb.in === n || sb.out === n))
+                        .sort((a, b) => credits[a] - credits[b] || rankOf[a] - rankOf[b]);
+                    const fielders = Object.entries(qd.lineup)
+                        .filter(([pos, n]) => pos !== 'GK' && !qLocks[pos] && !qd.subs.some(sb => sb.out === n || sb.in === n)
+                            && credits[n] - 0.5 >= (minCredits[n] || 0))
+                        .sort((a, b) => credits[b[1]] - credits[a[1]] || rankOf[b[1]] - rankOf[a[1]]);
+                    if (!benchers.length || !fielders.length) break;
+                    const inName = benchers[0];
+                    const [pos, outName] = fielders[0];
+                    if (credits[outName] - credits[inName] < 1) break;
+                    qd.subs.push({ in: inName, out: outName, pos });
+                    qd.reasons[pos] = { ...(qd.reasons[pos] || { name: outName, score: 0, reason: 'none', rank: -1 }), sub: inName };
+                    credits[inName] += 0.5;
+                    credits[outName] -= 0.5;
+                    made++; subCount++;
+                }
+            }
+        }
+
+        // 최소 보장 미달 경고
+        attendees.forEach(n => {
+            if ((minCredits[n] || 0) > 0 && credits[n] < minCredits[n]) {
+                warnings.push(`${n}: 최소 ${minCredits[n]}쿼터 보장을 채우지 못했습니다 (${credits[n]}쿼터).`);
+            }
         });
 
         const slotsTotal = onFieldSize * quarterCount;
@@ -320,7 +369,7 @@
             const least = attendees.filter(n => credits[n] === minC).join(', ');
             warnings.push(`출전 쿼터 차이 ${spread}Q — 최다 ${maxC}Q: ${most} / 최소 ${minC}Q: ${least} (GK 전담·잠금·출전 불가 때문일 수 있음)`);
         }
-        return { quarters: result.quarters, bench: result.bench, credits, target, warnings };
+        return { quarters: result.quarters, bench: result.bench, credits, target, subCount, warnings };
     }
 
     // 근거 표시용 라벨

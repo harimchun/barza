@@ -90,6 +90,7 @@ const AppState = {
     formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: inName } } — out 선수는 formationState[q][pos]
     formationCoords: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: {left,top}% } } 카드 자유 배치 오버라이드
     extraSubs: { '1Q': [], '2Q': [], '3Q': [], '4Q': [] },      // 포지션을 특정할 수 없는 교체 쌍 [{in,out}] (시트 이관분)
+    availability: {},   // { name: ['1Q','2Q','3Q'] } 일부 쿼터만 참석 (없으면 전 쿼터)
     pendingPick: null,  // 벤치에서 누른 선수 (다음에 누르는 자리에 배치)
     locks: {},          // { q: { pos: true } } 자동 초안이 건드리지 않는 자리
     draftReasons: {},   // { q: { pos: { name, reason, rank, score } } } 자동 초안 배치 근거
@@ -202,7 +203,44 @@ function editorTargets() {
         attendees: AppState.attendees,
         quarterCount: AppState.quarterCount,
         onFieldSize: AppState.onFieldSize,
+        availability: AppState.availability,
     });
+}
+
+// 선수가 해당 쿼터에 참석 가능한지 (설정 없으면 전 쿼터 가능)
+function playerAvailable(name, q) {
+    const av = AppState.availability && AppState.availability[name];
+    return !Array.isArray(av) || av.includes(q);
+}
+
+// 선수의 참석 가능 쿼터 목록
+function playerQuarters(name) {
+    const av = AppState.availability && AppState.availability[name];
+    return Array.isArray(av) ? av.filter(q => editorQuarters().includes(q)) : editorQuarters();
+}
+
+// 가능 쿼터 설정 (전 쿼터면 설정 제거)
+function setPlayerQuarters(name, quarters) {
+    const all = editorQuarters();
+    const list = all.filter(q => quarters.includes(q));
+    if (list.length === all.length) delete AppState.availability[name];
+    else AppState.availability[name] = list;
+}
+
+// 표시용: 전 쿼터 → "전체", 연속 구간 → "~3Q" / "2Q~" / "2Q~3Q", 그 외 → "1Q·3Q"
+function availabilityLabel(name) {
+    const all = editorQuarters();
+    const qs = playerQuarters(name);
+    if (qs.length === all.length) return '';
+    if (qs.length === 0) return '불참';
+    const idx = qs.map(q => all.indexOf(q));
+    const contiguous = idx.every((v, i) => i === 0 || v === idx[i - 1] + 1);
+    if (contiguous) {
+        if (idx[0] === 0) return `~${qs[qs.length - 1]}`;
+        if (idx[idx.length - 1] === all.length - 1) return `${qs[0]}~`;
+        return `${qs[0]}~${qs[qs.length - 1]}`;
+    }
+    return qs.join('·');
 }
 
 // 편집 중인 경기 상태에서 쿼터별 교체 쌍 목록 생성
@@ -247,6 +285,7 @@ function recordTargets(record) {
         attendees: (record && record.attendees) || [],
         quarterCount: (record && record.quarterCount) || recordQuarters(record).length,
         onFieldSize: (record && record.onFieldSize) || Quota.DEFAULT_ON_FIELD,
+        availability: (record && record.availability) || {},
     });
 }
 
@@ -265,6 +304,7 @@ function resetMatchState() {
     AppState.formationCoords = {};
     AppState.extraSubs = {};
     AppState.quarterScores = {};
+    AppState.availability = {};
     AppState.pendingPick = null;
     AppState.locks = {};
     AppState.draftReasons = {};
