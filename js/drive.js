@@ -3,7 +3,7 @@
 // =============================================
 //
 // DB 구조 (v2):
-//   /roster/{name}            { name, fullName, role:'member'|'guest', positions:[], jerseyNo, aliases:[], active }
+//   /roster/{name}            { name, fullName, role:'member'|'guest', positions:[], jerseyNo, aliases:[], active, priority:1|2|3 }
 //   /matches/{matchId}        경기 레코드 (docs/data-schema.md 참고)
 //   /settings/venues          ["잠실유수지", ...]
 //   /settings/editors         편집 가능한 구글 계정 { emailKey: {email,name,...} }
@@ -444,7 +444,7 @@ async function loadRoster() {
 // 레거시(v1: "Member"/"Guest" 문자열) → v2 객체
 function normalizePlayer(name, v) {
     if (typeof v === 'string') {
-        return { name, fullName: null, role: v === 'Guest' ? 'guest' : 'member', positions: [], jerseyNo: null, aliases: [], active: true };
+        return { name, fullName: null, role: v === 'Guest' ? 'guest' : 'member', positions: [], jerseyNo: null, aliases: [], active: true, priority: 2 };
     }
     return {
         name,
@@ -454,6 +454,7 @@ function normalizePlayer(name, v) {
         jerseyNo: (v.jerseyNo === 0 || v.jerseyNo) ? v.jerseyNo : null,
         aliases: Array.isArray(v.aliases) ? v.aliases : [],
         active: v.active !== false,
+        priority: [1, 2, 3].includes(Number(v.priority)) ? Number(v.priority) : 2, // 1 핵심 · 2 기본 · 3 보조
     };
 }
 

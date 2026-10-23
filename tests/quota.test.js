@@ -148,3 +148,13 @@ test('computeTargets: 전 쿼터 GK로 뛴 전담 GK는 초과·범위·균형 �
         attendees: ['키퍼', 'A', 'B'], quarterCount: 4, onFieldSize: 2 });
     assert.notEqual(t3.status['키퍼'], 'gk');
 });
+
+test('computeTargets: 가중치가 있으면 개인 목표가 비례하고 합은 슬롯 수', () => {
+    const attendees = ['a', 'b', 'c', 'd'];
+    const t = Quota.computeTargets({ quarters: {}, attendees, quarterCount: 4, onFieldSize: 2, weights: { a: 1.25, d: 0.75 } });
+    // 합 = 1.25 + 1 + 1 + 0.75 = 4 → a: 8×1.25/4 = 2.5, b/c: 2, d: 1.5
+    assert.ok(Math.abs(t.personalTarget.a - 2.5) < 1e-9);
+    assert.ok(Math.abs(t.personalTarget.b - 2) < 1e-9);
+    assert.ok(Math.abs(t.personalTarget.d - 1.5) < 1e-9);
+    assert.equal(Quota.PRIORITY_WEIGHTS[2], 1);
+});

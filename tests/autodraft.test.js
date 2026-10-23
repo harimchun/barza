@@ -164,3 +164,17 @@ test('generate: 출전 불가 쿼터 선수는 교체로도 투입되지 않음'
     assert.ok(!Object.values(q4.lineup).includes('우성') && !q4.subs.some(s => s.in === '우성' || s.out === '우성'));
     assert.ok(!Object.values(r.quarters['3Q'].lineup).includes('형록') && !r.quarters['3Q'].subs.some(s => s.in === '형록'));
 });
+
+test('generate: 우선순위 가중치 — 1순위는 더 많이, 3순위는 더 적게 뛰고 합은 44', () => {
+    const weights = {};
+    ATTENDEES_14.forEach(n => { weights[n] = 1; });
+    weights['지호'] = 1.25; weights['진환'] = 1.25;   // 1순위
+    weights['재성'] = 0.75; weights['송하명'] = 0.75; // 3순위
+    const r = AutoDraft.generate({ attendees: ATTENDEES_14, positions: POSITIONS, quarterCount: 4, onFieldSize: 11,
+        defaultFormation: '4-2-3-1', formationSlots: FORMATION_SLOTS, seed: 11, weights, allowSubs: true });
+    const sum = Object.values(r.credits).reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sum - 44) < 1e-9);
+    assert.ok(r.credits['지호'] >= 3.5 && r.credits['진환'] >= 3.5, `1순위 ${r.credits['지호']} ${r.credits['진환']}`);
+    assert.ok(r.credits['재성'] <= 3 && r.credits['송하명'] <= 3, `3순위 ${r.credits['재성']} ${r.credits['송하명']}`);
+    assert.ok(r.personalTarget['지호'] > r.personalTarget['우성'] && r.personalTarget['우성'] > r.personalTarget['재성']);
+});

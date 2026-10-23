@@ -21,6 +21,9 @@
     const DEFAULT_ON_FIELD = 11;
     const QUARTER_OPTIONS = [4, 5];
     const ON_FIELD_OPTIONS = [11, 10, 9, 8, 7];
+    // 선수 우선순위 → 출전 가중치 (1 = 핵심, 2 = 기본, 3 = 보조)
+    const PRIORITY_WEIGHTS = { 1: 1.25, 2: 1.0, 3: 0.75 };
+    const PRIORITY_LABELS = { 1: '1순위', 2: '2순위', 3: '3순위' };
 
     // 쿼터 키 목록: 4 → ['1Q','2Q','3Q','4Q']
     function quarterKeys(count) {
@@ -84,7 +87,8 @@
      * 목표/균형 지표
      * @param {Object} opts { quarters, attendees, quarterCount, onFieldSize, availability }
      *   availability: { name: ['1Q','2Q','3Q'] } — 일부 쿼터만 참석하는 선수 (없으면 전 쿼터)
-     *   개인 목표 = 총 슬롯 × (본인 가능 쿼터 ÷ 전원 가능 쿼터 합). 전원 전 쿼터면 slots/N 과 같다.
+     *   weights: { name: 1.25 }                    — 우선순위 가중치 (없으면 1)
+     *   개인 목표 = 총 슬롯 × (가중치 × 가능 쿼터) ÷ Σ(가중치 × 가능 쿼터). 전원 같으면 slots/N 과 같다.
      * @returns {Object} {
      *   quarterKeys, attendees, slots, target, personalTarget:{name:t}, availableCount:{name:n},
      *   perQuarter:{q:n}, actualSlots, participation, avg, min, max, spread,
@@ -117,9 +121,11 @@
             const av = availability[n];
             availableCount[n] = Array.isArray(av) ? av.filter(q => keys.includes(q)).length : quarterCount;
         });
-        const availSum = attendees.reduce((s, n) => s + availableCount[n], 0);
+        const weights = (opts && opts.weights) || {};
+        const weightOf = n => (typeof weights[n] === 'number' && weights[n] > 0) ? weights[n] : 1;
+        const availSum = attendees.reduce((s, n) => s + weightOf(n) * availableCount[n], 0);
         const personalTarget = {};
-        attendees.forEach(n => { personalTarget[n] = availSum ? slots * availableCount[n] / availSum : 0; });
+        attendees.forEach(n => { personalTarget[n] = availSum ? slots * weightOf(n) * availableCount[n] / availSum : 0; });
         const isFullTimeGK = n => {
             const p = participation[n];
             return !!p && p.played > 0 && p.gkQuarters === p.played && p.played >= availableCount[n];
@@ -170,7 +176,7 @@
     }
 
     return {
-        DEFAULT_QUARTER_COUNT, DEFAULT_ON_FIELD, QUARTER_OPTIONS, ON_FIELD_OPTIONS,
+        DEFAULT_QUARTER_COUNT, DEFAULT_ON_FIELD, QUARTER_OPTIONS, ON_FIELD_OPTIONS, PRIORITY_WEIGHTS, PRIORITY_LABELS,
         quarterKeys, quarterCredit, subAppearances, quarterNames,
         computeParticipation, computeTargets, participationStatus, fmt,
     };

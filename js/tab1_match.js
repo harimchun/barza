@@ -274,12 +274,13 @@ function renderSquadTable() {
             const myTarget = t.personalTarget[name] != null ? t.personalTarget[name] : t.target;
             const diff = p.credit - myTarget;
             const st = p.credit === 0 ? 'unplayed' : t.status[name];
-            const partial = Math.abs(myTarget - t.target) > 1e-9 ? ` <small class="my-target">목표 ${fmtQ(myTarget)}</small>` : '';
-            const diffStr = p.credit === 0 ? '미출전' : (st === 'gk' ? '전담' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}${partial}`);
+            const diffStr = p.credit === 0 ? '미출전' : (st === 'gk' ? '전담' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}`);
+            const prio = playerPriority(name);
             return `<tr class="squad-row-${st}">
-      <td class="squad-name">${escapeHtml(formatPlayerName(name))}</td>
+      <td class="squad-name">${prio === 1 ? '★ ' : ''}${escapeHtml(formatPlayerName(name))}${prio === 3 ? ' <small class="prio-mini">3순위</small>' : ''}</td>
       ${qCells}
       <td class="participation-score ${st}">${fmtQ(p.credit)}</td>
+      <td class="num-cell my-target-cell">${fmtQ(myTarget, 1)}</td>
       <td class="participation-diff ${st}">${diffStr}${statusLabel[st] ? ` <small>${statusLabel[st]}</small>` : ''}</td>
     </tr>`;
         }).join('');
@@ -288,11 +289,11 @@ function renderSquadTable() {
     container.innerHTML = `
     <table class="squad-table">
       <thead>
-        <tr><th>이름</th>${perQ}<th>참여</th><th>목표 ${fmtQ(t.target)}</th></tr>
+        <tr><th>이름</th>${perQ}<th>참여</th><th>목표</th><th>편차</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p class="hint-text" style="margin-top:0.4rem">● 주전 1쿼터 · ◐ 교체 In/Out 0.5쿼터 · 목표 = 출전 ${t.onFieldSize}명 × ${t.quarterCount}쿼터 ÷ 참석 ${t.attendees}명 · 목표와 1쿼터 이상 차이 나면 부족/초과</p>`;
+    <p class="hint-text" style="margin-top:0.4rem">● 주전 1쿼터 · ◐ 교체 0.5쿼터 · × 불참 쿼터 · 목표는 ${t.onFieldSize}명 × ${t.quarterCount}쿼터 = ${t.slots}슬롯을 우선순위 가중치(★1순위 ×1.25 · 3순위 ×0.75)와 참석 가능 쿼터에 비례해 나눈 값 · 1쿼터 이상 차이 나면 부족/초과</p>`;
 }
 
 // 목표 쿼터 (시트의 "예상 평균쿼터")
@@ -466,7 +467,8 @@ function renderFormationBuilder() {
             const p = t ? t.participation[n] : null;
             const credit = p ? p.credit : 0;
             const st = t ? (credit === 0 ? 'unplayed' : t.status[n]) : '';
-            return `<button type="button" class="bench-chip ${st} ${isGuest(n) ? 'is-guest' : ''} ${pending === n ? 'pending' : ''}" data-name="${escapeHtml(n)}">${escapeHtml(n)}<em>${fmtQ(credit)}${t ? `/${fmtQ(t.target)}` : ''}</em></button>`;
+            const myT = t ? (t.personalTarget[n] != null ? t.personalTarget[n] : t.target) : 0;
+            return `<button type="button" class="bench-chip ${st} ${isGuest(n) ? 'is-guest' : ''} ${pending === n ? 'pending' : ''}" data-name="${escapeHtml(n)}">${playerPriority(n) === 1 ? '★' : ''}${escapeHtml(n)}<em>${fmtQ(credit)}${t ? `/${fmtQ(myT, 1)}` : ''}</em></button>`;
         }).join('');
         const extraHtml = extra.length
             ? `<div class="extra-subs">기타 교체: ${extra.map((sb, i) =>
@@ -687,9 +689,9 @@ function openPickSheet(q, pos, mode) {
         const f = fit(n);
         const fitLabel = f.score >= 2.5 ? AutoDraft.reasonLabel(f) : (f.score > 0 ? AutoDraft.reasonLabel(f) : '');
         return `<button type="button" class="pick-chip ${st} ${extraCls} ${n === current ? 'current' : ''}" data-name="${escapeHtml(n)}">
-          <span class="pick-name">${escapeHtml(n)}${isGuest(n) ? '<small>용병</small>' : ''}</span>
+          <span class="pick-name">${playerPriority(n) === 1 ? '★ ' : ''}${escapeHtml(n)}${isGuest(n) ? '<small>용병</small>' : ''}${playerPriority(n) === 3 ? '<small>3순위</small>' : ''}</span>
           <span class="pick-meta">${prefs(n).slice(0, 2).join('·') || '-'}${fitLabel ? ` · <b>${escapeHtml(fitLabel)}</b>` : ''}</span>
-          <span class="pick-credit">${fmtQ(credit)}${t ? `/${fmtQ(t.target)}` : ''}</span>
+          <span class="pick-credit">${fmtQ(credit)}${t ? `/${fmtQ(t.personalTarget[n] != null ? t.personalTarget[n] : t.target, 1)}` : ''}</span>
         </button>`;
     };
 
@@ -776,6 +778,7 @@ function runAutoDraft() {
         attendees: AppState.attendees, positions,
         quarterCount: AppState.quarterCount, onFieldSize: AppState.onFieldSize,
         formations: AppState.formationTypes, formationSlots, locks, unavailable, minCredits,
+        weights: weightsFor(AppState.attendees),
         allowSubs: true,
         seed: AppState.draftSeed * 7919 + AppState.attendees.length,
     });

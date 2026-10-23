@@ -216,6 +216,7 @@
      *   locks: { q: { pos: name } }            고정 배치
      *   unavailable: { name: ['1Q'] }          출전 불가 쿼터
      *   minCredits: { name: 3 }                 최소 보장 쿼터 (예: 용병 3쿼터)
+     *   weights: { name: 1.25 }                 우선순위 가중치 — 누적 쿼터 ÷ 가중치가 낮은 선수부터 투입, 개인 목표도 비례
      *   allowSubs: boolean                      정수 쿼터로 균형이 안 맞으면 교체 쌍(0.5)으로 보정 (기본 true)
      *   maxSubsPerQuarter: number               쿼터당 교체 상한 (기본 3)
      *   seed: number
@@ -230,6 +231,13 @@
         const locks = opts.locks || {};
         const unavailable = opts.unavailable || {};
         const minCredits = opts.minCredits || {};
+        const weights = opts.weights || {};
+        const weightOf = n => (typeof weights[n] === 'number' && weights[n] > 0) ? weights[n] : 1;
+        const availCount = n => quarters.filter(q => !(unavailable[n] || []).includes(q)).length;
+        const weightSum = attendees.reduce((sum, n) => sum + weightOf(n) * availCount(n), 0);
+        const slotsAll = onFieldSize * quarterCount;
+        const personalTarget = {};
+        attendees.forEach(n => { personalTarget[n] = weightSum ? slotsAll * weightOf(n) * availCount(n) / weightSum : 0; });
         const allowSubs = opts.allowSubs !== false;
         const maxSubsPerQuarter = opts.maxSubsPerQuarter || 3;
         const seed = opts.seed || 1;
@@ -268,7 +276,7 @@
             const remaining = quarterCount - qi; // 이번 쿼터 포함 남은 쿼터 수
             // 최소 보장: 남은 쿼터를 다 뛰어야 겨우 채우는 선수는 강제 투입
             const mustPlay = n => Math.max(0, (minCredits[n] || 0) - credits[n]) >= remaining;
-            const sortKey = n => [mustPlay(n) ? 0 : 1, credits[n], benchedLast[n] ? 0 : 1, rankOf[n]];
+            const sortKey = n => [mustPlay(n) ? 0 : 1, credits[n] / weightOf(n), benchedLast[n] ? 0 : 1, rankOf[n]];
             pool.sort((a, b) => {
                 const ka = sortKey(a), kb = sortKey(b);
                 for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
@@ -331,18 +339,19 @@
                 const qLocks = locks[q] || {};
                 let made = 0;
                 while (made < maxSubsPerQuarter) {
+                    const dev = n => credits[n] - personalTarget[n]; // 개인 목표 대비 편차
                     const benchers = attendees
                         .filter(n => !Object.values(qd.lineup).includes(n) && !(unavailable[n] || []).includes(q)
                             && !qd.subs.some(sb => sb.in === n || sb.out === n))
-                        .sort((a, b) => credits[a] - credits[b] || rankOf[a] - rankOf[b]);
+                        .sort((a, b) => dev(a) - dev(b) || rankOf[a] - rankOf[b]);
                     const fielders = Object.entries(qd.lineup)
                         .filter(([pos, n]) => pos !== 'GK' && !qLocks[pos] && !qd.subs.some(sb => sb.out === n || sb.in === n)
                             && credits[n] - 0.5 >= (minCredits[n] || 0))
-                        .sort((a, b) => credits[b[1]] - credits[a[1]] || rankOf[b[1]] - rankOf[a[1]]);
+                        .sort((a, b) => dev(b[1]) - dev(a[1]) || rankOf[b[1]] - rankOf[a[1]]);
                     if (!benchers.length || !fielders.length) break;
                     const inName = benchers[0];
                     const [pos, outName] = fielders[0];
-                    if (credits[outName] - credits[inName] < 1) break;
+                    if (dev(outName) - dev(inName) < 1) break;
                     qd.subs.push({ in: inName, out: outName, pos });
                     qd.reasons[pos] = { ...(qd.reasons[pos] || { name: outName, score: 0, reason: 'none', rank: -1 }), sub: inName };
                     credits[inName] += 0.5;
@@ -368,15 +377,15 @@
             return played > 0 && played === gk;
         };
         const rangeNames = attendees.filter(n => !gkOnly(n));
-        const vals = rangeNames.map(n => credits[n]);
-        const maxC = vals.length ? Math.max(...vals) : 0, minC = vals.length ? Math.min(...vals) : 0;
-        const spread = maxC - minC;
+        const devs = rangeNames.map(n => credits[n] - personalTarget[n]);
+        const maxD = devs.length ? Math.max(...devs) : 0, minD = devs.length ? Math.min(...devs) : 0;
+        const spread = maxD - minD;
         if (spread >= 2) {
-            const most = rangeNames.filter(n => credits[n] === maxC).join(', ');
-            const least = rangeNames.filter(n => credits[n] === minC).join(', ');
-            warnings.push(`출전 쿼터 차이 ${spread}Q — 최다 ${maxC}Q: ${most} / 최소 ${minC}Q: ${least} (GK 전담·잠금·출전 불가 때문일 수 있음)`);
+            const most = rangeNames.filter(n => credits[n] - personalTarget[n] === maxD).map(n => `${n} ${credits[n]}Q`).join(', ');
+            const least = rangeNames.filter(n => credits[n] - personalTarget[n] === minD).map(n => `${n} ${credits[n]}Q`).join(', ');
+            warnings.push(`목표 대비 편차 차이 ${spread.toFixed(1)}Q — 초과: ${most} / 부족: ${least} (GK 전담·잠금·출전 불가 때문일 수 있음)`);
         }
-        return { quarters: result.quarters, bench: result.bench, credits, target, subCount, warnings };
+        return { quarters: result.quarters, bench: result.bench, credits, target, personalTarget, subCount, warnings };
     }
 
     // 근거 표시용 라벨

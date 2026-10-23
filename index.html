@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=20261024k">
+  <link rel="stylesheet" href="css/style.css?v=20261024l">
 
   <!-- Firebase SDK (익명 인증 — DB 쓰기 권한 확보용) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -65,8 +65,8 @@
 
       <!-- 경기 정보 -->
       <section class="card step-card" id="step-info">
-        <details class="info-details" open>
-          <summary class="step-title"><span class="step-num">0</span>경기 정보 <span id="info-summary-text" class="step-summary"></span></summary>
+        <details class="info-details step-details" open>
+          <summary class="step-title">경기 정보 <span id="info-summary-text" class="step-summary"></span></summary>
           <div class="form-row">
             <div class="form-group">
               <label for="match-date">경기 날짜</label>
@@ -117,7 +117,8 @@
         <!-- 1. 참석 -->
         <div>
           <section class="card step-card" id="step-attend">
-            <div class="step-title"><span class="step-num">1</span>참석 체크 <span id="attend-summary-text" class="step-summary"></span></div>
+            <details class="step-details" open>
+            <summary class="step-title">참석 체크 <span id="attend-summary-text" class="step-summary"></span></summary>
             <div class="attend-tools">
               <input type="search" id="attend-filter" placeholder="🔍 명단에서 이름 검색" autocomplete="off" aria-label="명단 검색">
               <div class="guest-add-row">
@@ -130,11 +131,12 @@
             <div id="player-checklist" class="player-checklist">
               <p class="empty-hint" style="padding:0.5rem">명단을 불러오는 중...</p>
             </div>
+            </details>
           </section>
 
           <section class="card step-card" id="step-squad">
-            <details class="squad-details" id="squad-details" open>
-              <summary><span class="step-title" style="margin:0"><span class="step-num">1.5</span>출전 현황</span><span id="squad-summary-text" class="step-summary"></span></summary>
+            <details class="squad-details step-details" id="squad-details" open>
+              <summary class="step-title">출전 현황 <span id="squad-summary-text" class="step-summary"></span></summary>
               <div id="playtime-stats"></div>
               <div id="squad-table-container"><p class="empty-hint">참석자를 선택하세요.</p></div>
             </details>
@@ -144,7 +146,8 @@
         <!-- 2. 배치 -->
         <div>
           <section class="card step-card" id="step-lineup">
-            <div class="step-title"><span class="step-num">2</span>포메이션 배치</div>
+            <details class="step-details" open>
+            <summary class="step-title">포메이션 배치</summary>
 
             <div class="formation-header">
               <div class="formation-header-left">
@@ -177,19 +180,22 @@
               <button id="export-formation-btn" class="btn-secondary btn-sm">📸 이미지 저장</button>
             </div>
             <div id="quarter-strip" class="quarter-strip"></div>
+            </details>
           </section>
         </div>
       </div>
 
       <!-- 3. 기록 -->
       <section class="card step-card" id="step-record">
-        <div class="step-title"><span class="step-num">3</span>실시간 기록</div>
+        <details class="step-details" open>
+        <summary class="step-title">실시간 기록</summary>
         <div id="live-recorder"></div>
+        </details>
       </section>
 
       <!-- 4. 저장 -->
       <section class="card step-card" id="step-save">
-        <div class="step-title"><span class="step-num">4</span>저장</div>
+        <div class="step-title">저장</div>
         <div id="autosave-status" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem"></div>
         <div class="save-buttons-row">
           <button id="new-match-btn" class="editor-only">새 경기</button>
@@ -248,16 +254,16 @@
   <div id="toast-container"></div>
 
   <!-- ========== SCRIPTS ========== -->
-  <script src="js/config.js?v=20261024k"></script>
-  <script src="js/quota.js?v=20261024k"></script>
-  <script src="js/autodraft.js?v=20261024k"></script>
-  <script src="js/app.js?v=20261024k"></script>
-  <script src="js/drive.js?v=20261024k"></script>
-  <script src="js/formation.js?v=20261024k"></script>
-  <script src="js/tab1_match.js?v=20261024k"></script>
-  <script src="js/tab2_stats.js?v=20261024k"></script>
-  <script src="js/tab3_history.js?v=20261024k"></script>
-  <script src="js/tab4_roster.js?v=20261024k"></script>
+  <script src="js/config.js?v=20261024l"></script>
+  <script src="js/quota.js?v=20261024l"></script>
+  <script src="js/autodraft.js?v=20261024l"></script>
+  <script src="js/app.js?v=20261024l"></script>
+  <script src="js/drive.js?v=20261024l"></script>
+  <script src="js/formation.js?v=20261024l"></script>
+  <script src="js/tab1_match.js?v=20261024l"></script>
+  <script src="js/tab2_stats.js?v=20261024l"></script>
+  <script src="js/tab3_history.js?v=20261024l"></script>
+  <script src="js/tab4_roster.js?v=20261024l"></script>
 
 </body>
 

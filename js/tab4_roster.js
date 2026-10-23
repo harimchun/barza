@@ -26,6 +26,9 @@ function renderRosterTab() {
           <label>선호 포지션<input type="text" class="re-positions" value="${escapeHtml((p.positions || []).join(', '))}" placeholder="예: RB, GK (우선순위 순)"></label>
           <label>등번호<input type="number" class="re-jersey" value="${p.jerseyNo == null ? '' : p.jerseyNo}" min="0"></label>
           <label>별칭<input type="text" class="re-aliases" value="${escapeHtml((p.aliases || []).join(', '))}" placeholder="기록에 쓰인 다른 표기"></label>
+          <label>우선순위<select class="re-priority">
+            ${[1, 2, 3].map(v => `<option value="${v}" ${(p.priority || 2) === v ? 'selected' : ''}>${Quota.PRIORITY_LABELS[v]} (×${Quota.PRIORITY_WEIGHTS[v]})</option>`).join('')}
+          </select></label>
           <label class="re-check"><input type="checkbox" class="re-active" ${p.active !== false ? 'checked' : ''}> 활동 중</label>
           <div class="roster-edit-actions">
             <button class="btn-primary btn-sm" data-action="save-edit" data-name="${safe}">저장</button>
@@ -36,6 +39,8 @@ function renderRosterTab() {
     </tr>`;
       }
       const pos = (p.positions || []).join(', ');
+      const prio = p.priority || 2;
+      const prioBadge = prio !== 2 ? ` <span class="prio-badge prio-${prio}" title="우선순위 ${prio} (출전 가중치 ×${Quota.PRIORITY_WEIGHTS[prio]})">${prio === 1 ? '★ 1순위' : '3순위'}</span>` : '';
       const meta = [
         p.fullName && p.fullName !== name ? escapeHtml(p.fullName) : '',
         p.jerseyNo != null ? `#${p.jerseyNo}` : '',
@@ -43,7 +48,7 @@ function renderRosterTab() {
       ].filter(Boolean).join(' · ');
       return `
     <tr>
-      <td class="roster-name">${safe}${meta ? `<div class="roster-meta">${meta}</div>` : ''}</td>
+      <td class="roster-name">${safe}${prioBadge}${meta ? `<div class="roster-meta">${meta}</div>` : ''}</td>
       <td class="roster-pos">${pos ? escapeHtml(pos) : '<span class="empty-hint">-</span>'}</td>
       <td><span class="role-badge ${isGuestGroup ? 'guest' : 'member'}">${isGuestGroup ? '용병' : (p.active === false ? '비활동' : '멤버')}</span></td>
       <td class="roster-actions">
@@ -72,6 +77,11 @@ function renderRosterTab() {
         <select id="new-player-role" class="editor-only">
           <option value="member">멤버</option>
           <option value="guest">용병</option>
+        </select>
+        <select id="new-player-priority" class="editor-only" title="출전 우선순위">
+          <option value="2">2순위 (기본)</option>
+          <option value="1">1순위 (핵심 ×1.25)</option>
+          <option value="3">3순위 (보조 ×0.75)</option>
         </select>
         <button class="btn-primary editor-only" data-action="add">등록하기</button>
       </div>
@@ -149,9 +159,11 @@ async function addPlayer() {
     showToast(`"${name}"은(는) 이미 등록되어 있습니다.`, 'error');
     return;
   }
+  const prioSel = document.getElementById('new-player-priority');
   AppState.roster[name] = normalizePlayer(name, {
     role: roleSel.value, positions: parsePositionsInput(posInp.value),
     fullName: name.length >= 3 ? name : null,
+    priority: prioSel ? parseInt(prioSel.value, 10) : 2,
   });
   nameInp.value = '';
   posInp.value = '';
@@ -173,6 +185,7 @@ async function savePlayerEdit(name, form) {
   p.jerseyNo = j === '' ? null : parseInt(j, 10);
   p.aliases = form.querySelector('.re-aliases').value.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
   p.active = form.querySelector('.re-active').checked;
+  p.priority = parseInt(form.querySelector('.re-priority').value, 10) || 2;
   AppState.rosterEditing = null;
   await persistPlayer(name, `${name} 정보를 저장했습니다.`);
 }

@@ -204,7 +204,22 @@ function editorTargets() {
         quarterCount: AppState.quarterCount,
         onFieldSize: AppState.onFieldSize,
         availability: AppState.availability,
+        weights: weightsFor(AppState.attendees),
     });
+}
+
+// 선수 우선순위 → 가중치 (1순위 1.25 · 2순위 1 · 3순위 0.75)
+function playerPriority(name) {
+    const p = getPlayer(name);
+    return p && [1, 2, 3].includes(p.priority) ? p.priority : 2;
+}
+function playerWeight(name) {
+    return Quota.PRIORITY_WEIGHTS[playerPriority(name)] || 1;
+}
+function weightsFor(names) {
+    const w = {};
+    (names || []).forEach(n => { w[n] = playerWeight(n); });
+    return w;
 }
 
 // 선수가 해당 쿼터에 참석 가능한지 (설정 없으면 전 쿼터 가능)
@@ -286,6 +301,7 @@ function recordTargets(record) {
         quarterCount: (record && record.quarterCount) || recordQuarters(record).length,
         onFieldSize: (record && record.onFieldSize) || Quota.DEFAULT_ON_FIELD,
         availability: (record && record.availability) || {},
+        weights: weightsFor((record && record.attendees) || []),
     });
 }
 
