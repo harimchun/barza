@@ -413,9 +413,11 @@ function fbRefresh() {
 // 주전 선택 (드롭다운)
 function fbApplyMain(q, pos, val) {
     const fMap = AppState.formationState[q];
+    const fSubs = AppState.formationSubs[q] || {};
     if (val === '-') { delete fMap[pos]; }
     else {
         Object.keys(fMap).forEach(p => { if (p !== pos && fMap[p] === val) delete fMap[p]; });
+        Object.keys(fSubs).forEach(p => { if (fSubs[p] === val) delete fSubs[p]; }); // 교체로 잡혀 있던 배정 해제
         fMap[pos] = val;
     }
     AppState.pendingPick = null;
@@ -632,6 +634,8 @@ function openPickSheet(q, pos, mode) {
     const assignedSub = new Set(Object.values(fSubs).filter(Boolean));
     const benchNames = AppState.attendees.filter(n => !assignedMain.has(n) && !assignedSub.has(n) && playerAvailable(n, q));
     const awayNames = AppState.attendees.filter(n => !assignedMain.has(n) && !assignedSub.has(n) && !playerAvailable(n, q));
+    // 교체(In)로 배정된 선수: 주전 자리로 옮길 수 있게 따로 표시 (현재 자리의 교체는 제외)
+    const subAssigned = Object.entries(fSubs).filter(([p, n]) => n && !(mode === 'sub' && p === pos) && playerAvailable(n, q));
     const prefs = n => ((getPlayer(n) || {}).positions || []);
     const fit = n => AutoDraft.fitDetail(prefs(n), pos);
     const sortByFit = names => [...names].sort((a, b) => fit(b).score - fit(a).score || ((t && t.participation[a]) ? t.participation[a].credit : 0) - ((t && t.participation[b]) ? t.participation[b].credit : 0) || a.localeCompare(b, 'ko'));
@@ -657,6 +661,10 @@ function openPickSheet(q, pos, mode) {
     html += `<div class="pick-section"><div class="pick-section-title">벤치 <small>${benchNames.length}명 · 적합도순</small></div>
         <div class="pick-list">${sortByFit(benchNames).map(n => chip(n)).join('') || '<span class="empty-hint">벤치에 선수가 없습니다.</span>'}</div>
         ${awayNames.length ? `<div class="hint-text" style="margin-top:0.3rem">이번 쿼터 불참: ${awayNames.map(escapeHtml).join(', ')}</div>` : ''}</div>`;
+    if (mode === 'main' && subAssigned.length) {
+        html += `<div class="pick-section"><div class="pick-section-title">교체로 배정된 선수 <small>고르면 교체 배정이 풀리고 이 자리의 주전이 됩니다</small></div>
+        <div class="pick-list">${subAssigned.map(([p, n]) => chip(n, 'from-sub').replace('<span class="pick-meta">', `<span class="pick-meta">⇄ ${escapeHtml(p)} 교체 · `)).join('')}</div></div>`;
+    }
     if (mode === 'main') {
         const others = Object.entries(fMap).filter(([p, n]) => n && p !== pos);
         if (others.length) {

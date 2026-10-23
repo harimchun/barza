@@ -2745,3 +2745,4 @@ body.sheet-open { overflow: hidden; }
 .bench-away span { margin-right: 0.4rem; } .bench-away small { color: var(--gold); }
 .check-away { color: var(--text-muted); opacity: 0.6; text-align: center; }
 .my-target { display: block; font-size: 0.6rem; color: var(--text-muted); font-weight: 400; }
+.pick-chip.from-sub { border-color: rgba(237, 187, 0, 0.45); }
