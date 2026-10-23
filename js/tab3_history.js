@@ -103,6 +103,7 @@ function renderMatchDetail(match) {
   }).join('');
 
   // 명단: 쿼터별 ● 주전 / ◐ 교체 관여 + 실 참여 합계
+  const targets = recordTargets(match);
   const played = [...names].filter(n => credits[n] > 0).sort((a, b) => (credits[b] - credits[a]) || a.localeCompare(b, 'ko'));
   const benchOnly = [...names].filter(n => !(credits[n] > 0));
   const squadRows = played.map(n => {
@@ -121,7 +122,6 @@ function renderMatchDetail(match) {
     return `<li><strong>${q}</strong> ${subs.map(s => `${escapeHtml(s.in || '?')} <span class="sub-arrow">→</span> ${escapeHtml(s.out || '?')}${s.pos ? ` <small>(${escapeHtml(s.pos)})</small>` : ''}`).join(' · ')}</li>`;
   }).join('');
   const playedCount = played.length;
-  const targets = recordTargets(match);
 
   // 포메이션 이미지
   const plan = {}, subsMap = {}, types = {}, coords = {};
