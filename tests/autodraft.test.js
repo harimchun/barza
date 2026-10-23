@@ -117,7 +117,7 @@ test('generate: 같은 시드는 같은 결과', () => {
 test('reasonLabel', () => {
     assert.equal(AutoDraft.reasonLabel({ reason: 'exact', rank: 0 }), '1순위');
     assert.equal(AutoDraft.reasonLabel({ reason: 'exact', rank: 1 }), '2순위');
-    assert.equal(AutoDraft.reasonLabel({ reason: 'locked' }), '🔒 고정');
+    assert.equal(AutoDraft.reasonLabel({ reason: 'locked' }), '고정');
     assert.equal(AutoDraft.reasonLabel({ reason: 'none' }), '대체');
 });
 
