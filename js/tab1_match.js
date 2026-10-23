@@ -15,7 +15,63 @@ function renderTab1() {
     updateEditModeNotice();
     renderFormationOverview();
     renderMatchSummary();
+    updateUndoButtons();
     updateAutoSaveStatus();
+}
+
+// ── 실행 취소 / 다시 실행 (배치 편집 상태 스냅샷) ─────────────────────────
+const UNDO_LIMIT = 60;
+const UNDO_KEYS = ['formationTypes', 'formationState', 'formationSubs', 'formationCoords', 'extraSubs', 'locks', 'draftReasons', 'attendees', 'availability', 'currentQuarter'];
+
+function editorSnapshot() {
+    const snap = {};
+    UNDO_KEYS.forEach(k => { snap[k] = JSON.parse(JSON.stringify(AppState[k] == null ? null : AppState[k])); });
+    return snap;
+}
+
+function applySnapshot(snap) {
+    UNDO_KEYS.forEach(k => { AppState[k] = JSON.parse(JSON.stringify(snap[k])); });
+    AppState.pendingPick = null;
+    AppState.availabilityEditing = null;
+    ensureQuarterState();
+    renderTab1();
+}
+
+// 변경 직전에 호출 — 현재 상태를 되돌리기 스택에 저장
+function pushUndo() {
+    if (!AppState.undoStack) { AppState.undoStack = []; AppState.redoStack = []; }
+    AppState.undoStack.push(editorSnapshot());
+    if (AppState.undoStack.length > UNDO_LIMIT) AppState.undoStack.shift();
+    AppState.redoStack = [];
+    updateUndoButtons();
+}
+
+function undoEdit() {
+    if (!AppState.undoStack || !AppState.undoStack.length) { showToast('되돌릴 변경이 없습니다.', 'error'); return; }
+    AppState.redoStack.push(editorSnapshot());
+    applySnapshot(AppState.undoStack.pop());
+    updateUndoButtons();
+    showToast('↶ 실행 취소');
+}
+
+function redoEdit() {
+    if (!AppState.redoStack || !AppState.redoStack.length) { showToast('다시 실행할 변경이 없습니다.', 'error'); return; }
+    AppState.undoStack.push(editorSnapshot());
+    applySnapshot(AppState.redoStack.pop());
+    updateUndoButtons();
+    showToast('↷ 다시 실행');
+}
+
+function clearUndo() {
+    AppState.undoStack = [];
+    AppState.redoStack = [];
+    updateUndoButtons();
+}
+
+function updateUndoButtons() {
+    const u = document.getElementById('undo-btn'), r = document.getElementById('redo-btn');
+    if (u) u.disabled = !(AppState.undoStack && AppState.undoStack.length);
+    if (r) r.disabled = !(AppState.redoStack && AppState.redoStack.length);
 }
 
 // ── 고정 요약 바 ───────────────────────────────────────────────────────────
@@ -183,6 +239,7 @@ function renderPlayerChecklist() {
     container.querySelectorAll('.player-cb').forEach(cb => {
         cb.addEventListener('change', () => {
             const name = cb.dataset.name;
+            pushUndo();
             if (cb.checked) {
                 if (!AppState.attendees.includes(name)) AppState.attendees.push(name);
             } else {
@@ -211,6 +268,7 @@ function renderPlayerChecklist() {
             const cur = playerQuarters(name);
             const next = cur.includes(q) ? cur.filter(x => x !== q) : [...cur, q];
             if (next.length === 0) { showToast('최소 한 쿼터는 참석해야 합니다. 아예 불참이면 체크를 해제하세요.', 'error'); return; }
+            pushUndo();
             setPlayerQuarters(name, next);
             // 불참 쿼터에 배치돼 있으면 빼기
             editorQuarters().forEach(qq => {
@@ -415,6 +473,7 @@ function fbRefresh() {
 
 // 주전 선택 (드롭다운)
 function fbApplyMain(q, pos, val) {
+    pushUndo();
     const fMap = AppState.formationState[q];
     const fSubs = AppState.formationSubs[q] || {};
     if (val === '-') { delete fMap[pos]; }
@@ -429,6 +488,7 @@ function fbApplyMain(q, pos, val) {
 
 // 교체 선택 (드롭다운)
 function fbApplySub(q, pos, val) {
+    pushUndo();
     const fSubs = AppState.formationSubs[q];
     if (val === '-') delete fSubs[pos]; else fSubs[pos] = val;
     fbRefresh();
@@ -490,6 +550,7 @@ function renderFormationBuilder() {
             renderFormationBuilder();
         }));
         bench.querySelectorAll('.extra-sub-del').forEach(btn => btn.addEventListener('click', () => {
+            pushUndo();
             AppState.extraSubs[q].splice(parseInt(btn.dataset.idx, 10), 1);
             fbRefresh();
         }));
@@ -549,9 +610,15 @@ function renderFormationBuilder() {
         btn.addEventListener('click', () => {
             const pos = btn.dataset.pos;
             if (!fMap[pos] || fMap[pos] === '-') { showToast('선수를 먼저 배치한 뒤 잠글 수 있습니다.', 'error'); return; }
+            pushUndo();
             if (!AppState.locks[q]) AppState.locks[q] = {};
-            if (AppState.locks[q][pos]) delete AppState.locks[q][pos]; else AppState.locks[q][pos] = true;
+            if (AppState.locks[q][pos]) delete AppState.locks[q][pos];
+            else {
+                AppState.locks[q][pos] = true;
+                if (pos === 'GK' && maybeLockGkAllQuarters(q, fMap[pos])) { fbRefresh(); return; }
+            }
             renderFormationBuilder();
+            renderFormationOverview();
         });
     });
     container.querySelectorAll('.pos-sub-toggle').forEach(btn => {
@@ -598,6 +665,7 @@ function renderFormationBuilder() {
             const onUp = () => {
                 finish();
                 if (moved) {
+                    pushUndo();
                     if (!AppState.formationCoords[q]) AppState.formationCoords[q] = {};
                     AppState.formationCoords[q][pos] = { left: parseFloat(cell.style.left), top: parseFloat(cell.style.top) };
                 } else if (AppState.pendingPick && checkEditorAccess()) {
@@ -637,16 +705,39 @@ function toggleQuarterLock() {
     const st = quarterLockState(q);
     if (st.filled === 0) { showToast('배치된 선수가 없습니다.', 'error'); return; }
     const fMap = AppState.formationState[q];
+    pushUndo();
     if (!AppState.locks[q]) AppState.locks[q] = {};
     if (st.all) {
         AppState.locks[q] = {};
         showToast(`${q} 전체 고정을 해제했습니다.`);
     } else {
+        const gkWasLocked = !!AppState.locks[q].GK;
         Object.keys(fMap).forEach(p => { if (fMap[p] && fMap[p] !== '-') AppState.locks[q][p] = true; });
         showToast(`${q} 배치 ${st.filled}자리를 고정했습니다. 자동 초안이 이 쿼터는 유지합니다. 🔒`);
+        if (!gkWasLocked && fMap.GK && fMap.GK !== '-') maybeLockGkAllQuarters(q, fMap.GK);
     }
-    renderFormationBuilder();
-    renderFormationOverview();
+    fbRefresh();
+}
+
+// GK 를 잠글 때: 다른 쿼터에도 같은 GK 를 배치하고 잠글지 확인 (참석 불가 쿼터 제외)
+function maybeLockGkAllQuarters(fromQ, name) {
+    if (!name) return false;
+    const others = editorQuarters().filter(q => q !== fromQ && playerAvailable(name, q));
+    const pending = others.filter(q => (AppState.formationState[q] || {}).GK !== name || !(AppState.locks[q] || {}).GK);
+    if (!pending.length) return false;
+    if (!confirm(`GK ${name}을(를) ${pending.join('·')}에도 GK로 배치하고 고정할까요?\n(그 쿼터의 다른 자리에 있으면 GK로 옮기고, 기존 GK는 벤치로 내려갑니다)`)) return false;
+    pending.forEach(q => {
+        ensureQuarterState();
+        const fMap = AppState.formationState[q];
+        Object.keys(fMap).forEach(p => { if (fMap[p] === name) delete fMap[p]; });
+        const fSubs = AppState.formationSubs[q] || {};
+        Object.keys(fSubs).forEach(p => { if (fSubs[p] === name) delete fSubs[p]; });
+        fMap.GK = name;
+        if (!AppState.locks[q]) AppState.locks[q] = {};
+        AppState.locks[q].GK = true;
+    });
+    showToast(`GK ${name}을(를) 전 쿼터에 고정했습니다. 🧤`);
+    return true;
 }
 
 // 대기 선수(벤치에서 누른 선수)를 자리에 배치 — 자리에 있던 선수는 벤치로
@@ -654,6 +745,7 @@ function placePending(q, pos) {
     const name = AppState.pendingPick;
     AppState.pendingPick = null;
     if (!name) return;
+    pushUndo();
     const fMap = AppState.formationState[q];
     // 같은 선수가 다른 자리에 있으면 그 자리를 비움
     Object.keys(fMap).forEach(p => { if (fMap[p] === name) delete fMap[p]; });
@@ -732,6 +824,7 @@ function openPickSheet(q, pos, mode) {
         if (mode === 'sub') { fbApplySub(q, pos, name); return; }
         const swapPos = c.dataset.swapPos;
         if (swapPos) {
+            pushUndo();
             const mine = fMap[pos] || null;
             fMap[pos] = name;
             if (mine) fMap[swapPos] = mine; else delete fMap[swapPos];
@@ -773,6 +866,7 @@ function runAutoDraft() {
         if (away.length) unavailable[n] = away;
         if (isGuest(n)) minCredits[n] = Math.min(GUEST_MIN_QUARTERS, playerQuarters(n).length);
     });
+    pushUndo();
     AppState.draftSeed += 1;
     const result = AutoDraft.generate({
         attendees: AppState.attendees, positions,
@@ -1147,7 +1241,7 @@ function initTab1Events() {
             try { await savePlayer(name); }
             catch (e) { showToast('포지션 저장 실패: ' + e.message, 'error'); }
         }
-        if (!AppState.attendees.includes(name)) AppState.attendees.push(name);
+        if (!AppState.attendees.includes(name)) { pushUndo(); AppState.attendees.push(name); }
         inp.value = '';
         if (posInp) posInp.value = '';
         renderPlayerChecklist();
@@ -1181,6 +1275,7 @@ function initTab1Events() {
     // 포메이션 타입 변경
     document.getElementById('formation-type-select').addEventListener('change', e => {
         const q = AppState.currentQuarter;
+        pushUndo();
         AppState.formationTypes[q] = e.target.value;
         AppState.formationState[q] = {};
         AppState.formationSubs[q] = {};
@@ -1193,6 +1288,7 @@ function initTab1Events() {
     const resetBtn = document.getElementById('formation-reset-btn');
     if (resetBtn) resetBtn.addEventListener('click', () => {
         const q = AppState.currentQuarter;
+        pushUndo();
         AppState.formationCoords[q] = {};
         renderFormationBuilder();
         renderFormationOverview();
@@ -1204,11 +1300,29 @@ function initTab1Events() {
     if (draftBtn) draftBtn.addEventListener('click', runAutoDraft);
     const lockBtn = document.getElementById('lock-quarter-btn');
     if (lockBtn) lockBtn.addEventListener('click', toggleQuarterLock);
+    const undoBtn = document.getElementById('undo-btn');
+    if (undoBtn) undoBtn.addEventListener('click', undoEdit);
+    const redoBtn = document.getElementById('redo-btn');
+    if (redoBtn) redoBtn.addEventListener('click', redoEdit);
+    document.addEventListener('keydown', e => {
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+        const tag = (e.target && e.target.tagName) || '';
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || (e.target && e.target.isContentEditable)) return;
+        if (!document.getElementById('tab1').classList.contains('active')) return;
+        if (e.key === 'z' || e.key === 'Z') {
+            e.preventDefault();
+            if (e.shiftKey) redoEdit(); else undoEdit();
+        } else if (e.key === 'y' || e.key === 'Y') {
+            e.preventDefault();
+            redoEdit();
+        }
+    });
     document.getElementById('draft-save-btn').addEventListener('click', () => handleSave(true));
     document.getElementById('final-save-btn').addEventListener('click', () => handleSave(false));
     document.getElementById('new-match-btn').addEventListener('click', () => {
         if (confirm('현재 입력 내용을 초기화하고 새 경기를 시작하시겠습니까?')) {
             resetMatchState();
+            clearUndo();
             const fp = document.getElementById('match-date')._flatpickr;
             if (fp) fp.setDate(today()); else document.getElementById('match-date').value = today();
             populateVenueSelect(AppState.matchLocation);
@@ -1381,6 +1495,7 @@ function loadMatchToEditor(record) {
     AppState.formationTypes = {}; AppState.formationState = {}; AppState.formationCoords = {};
     AppState.formationSubs = {}; AppState.extraSubs = {}; AppState.quarterScores = {};
     AppState.locks = {}; AppState.draftReasons = {}; AppState.draftSeed = 0;
+    clearUndo();
 
     editorQuarters().forEach(q => {
         const qd = (record.quarters || {})[q] || {};
