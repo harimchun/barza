@@ -152,7 +152,9 @@ function renderStatsTab() {
     }).join('');
 
     const sort = AppState.statsSort || { key: 'quarters', dir: -1 };
-    const sorted = [...players].sort((a, b) => {
+    const includeGuests = !!f.fullIncludeGuests;
+    const tablePlayers = includeGuests ? players : players.filter(p => !isGuest(p.name));
+    const sorted = [...tablePlayers].sort((a, b) => {
         const col = STATS_COLUMNS.find(c => c.key === sort.key) || STATS_COLUMNS[3];
         const va = a[col.key], vb = b[col.key];
         const cmp = col.text ? String(va).localeCompare(String(vb), 'ko') : (va - vb);
@@ -211,7 +213,8 @@ function renderStatsTab() {
     </div>
 
     <div class="leaderboard-card" style="margin-top:0.75rem">
-      <h3>👥 전체 선수 기록 <small class="hint-text">열 제목을 눌러 정렬 · 이름을 누르면 상세</small></h3>
+      <h3>👥 전체 선수 기록 <small class="hint-text">열 제목을 눌러 정렬 · 이름을 누르면 상세</small>
+        <label class="stats-check table-toggle"><input type="checkbox" id="stats-full-guests" ${includeGuests ? 'checked' : ''}> 용병 포함 <small>(${players.filter(p => isGuest(p.name)).length}명)</small></label></h3>
       <div class="table-scroll">
         <table class="leaderboard-table full-stats">
           <thead><tr><th>#</th>${headerCells}</tr></thead>
@@ -248,6 +251,8 @@ function bindStatsFilter() {
     if (i) i.addEventListener('change', () => { f.includeIntra = i.checked; renderStatsTab(); });
     const d = document.getElementById('stats-draft');
     if (d) d.addEventListener('change', () => { f.status = d.checked ? 'all' : 'final'; renderStatsTab(); });
+    const g = document.getElementById('stats-full-guests');
+    if (g) g.addEventListener('change', () => { f.fullIncludeGuests = g.checked; renderStatsTab(); });
 }
 
 function buildLeaderboardTable(players, columns) {

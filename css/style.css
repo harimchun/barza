@@ -2767,3 +2767,5 @@ body.sheet-open { overflow: hidden; }
 .my-target-cell { font-size: 0.78rem; color: var(--text-muted); }
 .undo-group { display: inline-flex; gap: 0.25rem; }
 .undo-group .btn-icon:disabled { opacity: 0.35; cursor: default; }
+.table-toggle { float: right; font-size: 0.78rem; font-weight: 500; margin-left: 0.6rem; }
+@media (max-width: 600px) { .table-toggle { float: none; display: flex; margin: 0.3rem 0 0; } }
