@@ -14,7 +14,37 @@ function renderTab1() {
     renderFormationBuilder();
     updateEditModeNotice();
     renderFormationOverview();
+    renderMatchSummary();
     updateAutoSaveStatus();
+}
+
+// ── 고정 요약 바 ───────────────────────────────────────────────────────────
+function renderMatchSummary() {
+    const el = document.getElementById('match-summary');
+    if (!el) return;
+    const n = AppState.attendees.length;
+    const t = n ? editorTargets() : null;
+    const info = document.getElementById('info-summary-text');
+    if (info) info.textContent = `${AppState.matchDate} · ${AppState.matchLocation} vs ${AppState.matchOpponent || '상대팀'} · ${AppState.quarterCount}Q × ${AppState.onFieldSize}명`;
+    const att = document.getElementById('attend-summary-text');
+    if (att) att.textContent = n ? `${n}명` : '';
+    let balance = '';
+    if (t) {
+        const ok = t.balanced && !t.under.length && !t.over.length && !t.unplayed.length;
+        balance = `<span class="sum-pill ${ok ? 'ok' : 'warn'}">${ok ? '균형' : `${t.under.length + t.over.length + t.unplayed.length}명 확인`}</span>`;
+    }
+    el.innerHTML = `
+      <div class="sum-main">
+        <span class="sum-title">${escapeHtml(AppState.matchDate.slice(5))} · vs ${escapeHtml(AppState.matchOpponent || '상대팀')}</span>
+        <span class="sum-stat">참석 <strong>${n}</strong></span>
+        ${t ? `<span class="sum-stat">목표 <strong>${fmtQ(t.target)}Q</strong></span><span class="sum-stat">범위 <strong>${fmtQ(t.min)}~${fmtQ(t.max)}</strong></span>` : ''}
+        ${balance}
+      </div>
+      <nav class="sum-nav">
+        <a href="#step-attend">참석</a><a href="#step-lineup">배치</a><a href="#step-record">기록</a><a href="#step-save">저장</a>
+      </nav>`;
+    const sq = document.getElementById('squad-summary-text');
+    if (sq) sq.textContent = t ? `목표 ${fmtQ(t.target)}Q · 실제 ${fmtQ(t.min)}~${fmtQ(t.max)}Q${t.unplayed.length ? ` · 미출전 ${t.unplayed.length}` : ''}` : '';
 }
 
 // 쿼터 선택 버튼 (쿼터 수에 따라 4~5개)
@@ -57,75 +87,51 @@ function updateEditModeNotice() {
     }
 }
 
-// ── 전체 쿼터 포메이션 개요 ──────────────────────────────────────────────
+// ── 전체 쿼터 요약 스트립 (미니맵 대체) ────────────────────────────────────
 function renderFormationOverview() {
-    const grid = document.getElementById('overview-grid');
-    if (grid) {
-        const want = editorQuarters().map(q => `overview-canvas-${q}`).join(',');
-        if (grid.dataset.canvases !== want) {
-            grid.innerHTML = editorQuarters().map(q => `
-              <div class="overview-quarter">
-                <div class="overview-q-label">${q}</div>
-                <canvas id="overview-canvas-${q}" class="overview-canvas" width="280" height="190"></canvas>
-              </div>`).join('');
-            grid.dataset.canvases = want;
-        }
-    }
-    editorQuarters().forEach(q => {
-        const canvas = document.getElementById(`overview-canvas-${q}`);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const W = canvas.width, H = canvas.height;
-
-        ctx.fillStyle = '#1a4731';
-        ctx.fillRect(0, 0, W, H);
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(4, 4, W - 8, H - 8);
-        ctx.beginPath();
-        ctx.moveTo(4, H / 2); ctx.lineTo(W - 4, H / 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(W / 2, H / 2, Math.min(W, H) * 0.1, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const formation = AppState.formationState[q] || {};
-        if (Object.keys(formation).length === 0) {
-            ctx.fillStyle = 'rgba(255,255,255,0.2)';
-            ctx.font = `${W * 0.07}px Pretendard, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('미배치', W / 2, H / 2);
-            return;
-        }
-
-        const formationType = AppState.formationTypes[q] || '4-2-3-1';
-        Object.entries(formation).filter(([, player]) => player && player !== '-').forEach(([pos, player]) => {
-            const coord = getPosCoord(q, pos, formationType);
-            const cx = W * (coord.left / 100);
-            const cy = H * (coord.top / 100);
-            const r = W * 0.038;
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#A50044';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${W * 0.055}px Pretendard, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText((player || '').slice(0, 2), cx, cy + r + 1);
-        });
-    });
+    const el = document.getElementById('quarter-strip');
+    if (!el) return;
+    const t = AppState.attendees.length ? editorTargets() : null;
+    el.innerHTML = editorQuarters().map(q => {
+        const fType = AppState.formationTypes[q] || '4-2-3-1';
+        const fDef = FORMATION_POSITIONS[fType];
+        const lineup = AppState.formationState[q] || {};
+        const subs = editorSubsForQuarter(q);
+        const n = Object.values(lineup).filter(Boolean).length;
+        const rows = fDef ? fDef.rows.map(row => {
+            const names = row.positions.map(p => lineup[p]).filter(Boolean);
+            if (!names.length) return '';
+            return `<div class="qs-line"><span class="qs-line-key qs-${row.key}">${row.key.toUpperCase()}</span>${names.map(escapeHtml).join(' · ')}</div>`;
+        }).reverse().join('') : '';
+        const subHtml = subs.length ? `<div class="qs-subs">⇄ ${subs.map(sb => `${escapeHtml(sb.in || '?')}→${escapeHtml(sb.out || '?')}`).join(', ')}</div>` : '';
+        const bench = AppState.attendees.filter(x => !Object.values(lineup).includes(x) && !subs.some(sb => sb.in === x));
+        const benchHtml = bench.length ? `<div class="qs-bench">벤치 ${bench.map(escapeHtml).join(', ')}</div>` : '';
+        const short = t && n < t.onFieldSize ? `<span class="qs-warn">${n}/${t.onFieldSize}</span>` : `<span class="qs-count">${n}명</span>`;
+        return `
+          <button type="button" class="qs-card ${q === AppState.currentQuarter ? 'active' : ''}" data-q="${q}">
+            <div class="qs-head"><span class="qs-q">${q}</span><span class="qs-type">${escapeHtml(fType)}</span>${short}</div>
+            ${rows || '<div class="qs-empty">미배치</div>'}
+            ${subHtml}${benchHtml}
+          </button>`;
+    }).join('');
+    el.querySelectorAll('.qs-card').forEach(btn => btn.addEventListener('click', () => {
+        AppState.currentQuarter = btn.dataset.q;
+        renderQuarterSelector();
+        renderFormationBuilder();
+        renderFormationOverview();
+        const b = document.getElementById('formation-builder');
+        if (b && window.innerWidth < 900) b.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
 }
 
 // ── 참석자 체크리스트 (멤버 / 비활동 멤버 / 용병 그룹) ────────────────────
 function renderPlayerChecklist() {
     const container = document.getElementById('player-checklist');
     if (!container) return;
-    const { members, inactive, guests, lastSeen } = getRosterGroups();
+    const groups = getRosterGroups();
+    const { inactive, guests, lastSeen } = groups;
+    // 멤버는 최근 참석순(같으면 이름순)
+    const members = [...groups.members].sort((a, b) => (lastSeen[b] || '').localeCompare(lastSeen[a] || '') || a.localeCompare(b, 'ko'));
 
     const item = (name) => {
         const checked = AppState.attendees.includes(name) ? 'checked' : '';
@@ -133,7 +139,7 @@ function renderPlayerChecklist() {
         const safe = escapeHtml(name);
         const p = getPlayer(name) || {};
         const pos = (p.positions || []).slice(0, 2).join('·');
-        const seen = guest && lastSeen[name] ? `<em>${escapeHtml(lastSeen[name].slice(5))}</em>` : '';
+        const seen = lastSeen[name] ? `<em>${escapeHtml(lastSeen[name].slice(5))}</em>` : '';
         return `
       <label class="player-check-item ${guest ? 'is-guest' : ''}">
         <input type="checkbox" class="player-cb" data-name="${safe}" ${checked}>
@@ -170,18 +176,24 @@ function renderPlayerChecklist() {
             renderPlaytimeStats();
             renderLiveRecorder();
             renderFormationBuilder();
+            renderFormationOverview();
+            renderMatchSummary();
         });
     });
 
-    const filter = container.querySelector('#guest-filter');
-    if (filter) {
-        filter.addEventListener('input', () => {
-            const kw = filter.value.trim();
-            container.querySelectorAll('#guest-check-grid .player-check-item').forEach(el => {
-                const n = el.querySelector('.player-cb').dataset.name;
-                el.style.display = (!kw || n.includes(kw)) ? '' : 'none';
-            });
+    const applyFilter = (kw) => {
+        container.querySelectorAll('.player-check-item').forEach(el => {
+            const n = el.querySelector('.player-cb').dataset.name;
+            el.style.display = (!kw || n.includes(kw)) ? '' : 'none';
         });
+        container.querySelectorAll('details.check-group').forEach(d => { if (kw) d.open = true; });
+    };
+    const filter = container.querySelector('#guest-filter');
+    if (filter) filter.addEventListener('input', () => applyFilter(filter.value.trim()));
+    const globalFilter = document.getElementById('attend-filter');
+    if (globalFilter) {
+        globalFilter.oninput = () => applyFilter(globalFilter.value.trim());
+        if (globalFilter.value.trim()) applyFilter(globalFilter.value.trim());
     }
 }
 
@@ -341,12 +353,18 @@ function fbRefresh() {
     renderSquadTable();
     renderPlaytimeStats();
     renderFormationOverview();
+    renderMatchSummary();
 }
 
 // 주전 선택 (드롭다운)
 function fbApplyMain(q, pos, val) {
     const fMap = AppState.formationState[q];
-    if (val === '-') delete fMap[pos]; else fMap[pos] = val;
+    if (val === '-') { delete fMap[pos]; }
+    else {
+        Object.keys(fMap).forEach(p => { if (p !== pos && fMap[p] === val) delete fMap[p]; });
+        fMap[pos] = val;
+    }
+    AppState.pendingPick = null;
     fbRefresh();
 }
 
@@ -374,65 +392,46 @@ function renderFormationBuilder() {
     const fMap = AppState.formationState[q];
     const fSubs = AppState.formationSubs[q];
     const extra = AppState.extraSubs[q] || [];
+    const t = AppState.attendees.length ? editorTargets() : null;
+    const pending = AppState.pendingPick;
 
     // ── 벤치 (현재 쿼터에 주전/교체로 배정되지 않은 참석자) ──
     const assigned = new Set();
     Object.values(fMap).forEach(n => { if (n && n !== '-') assigned.add(n); });
     Object.values(fSubs).forEach(n => { if (n && n !== '-') assigned.add(n); });
-    extra.forEach(s => { if (s.in) assigned.add(s.in); if (s.out) assigned.add(s.out); });
+    extra.forEach(sb => { if (sb.in) assigned.add(sb.in); if (sb.out) assigned.add(sb.out); });
     const benchPlayers = AppState.attendees.filter(n => !assigned.has(n));
 
     if (bench) {
-        const target = targetQuarters();
         const chips = benchPlayers.map(n => {
-            const part = getParticipation(n);
-            const pLabel = `<em>${fmtQ(part)}/${target.toFixed(1)}</em>`;
-            return `<span class="bench-chip${isGuest(n) ? ' is-guest' : ''}">${escapeHtml(n)}${pLabel}</span>`;
+            const p = t ? t.participation[n] : null;
+            const credit = p ? p.credit : 0;
+            const st = t ? (credit === 0 ? 'unplayed' : t.status[n]) : '';
+            return `<button type="button" class="bench-chip ${st} ${isGuest(n) ? 'is-guest' : ''} ${pending === n ? 'pending' : ''}" data-name="${escapeHtml(n)}">${escapeHtml(n)}<em>${fmtQ(credit)}${t ? `/${fmtQ(t.target)}` : ''}</em></button>`;
         }).join('');
         const extraHtml = extra.length
-            ? `<div class="extra-subs">기타 교체: ${extra.map((s, i) =>
-                `<span class="extra-sub">${escapeHtml(s.in || '?')} → ${escapeHtml(s.out || '?')} <button type="button" class="extra-sub-del" data-idx="${i}" title="삭제">✕</button></span>`).join(' ')}</div>`
+            ? `<div class="extra-subs">기타 교체: ${extra.map((sb, i) =>
+                `<span class="extra-sub">${escapeHtml(sb.in || '?')} → ${escapeHtml(sb.out || '?')} <button type="button" class="extra-sub-del" data-idx="${i}" title="삭제">✕</button></span>`).join(' ')}</div>`
             : '';
         bench.innerHTML = `
       <div class="bench-head">
-        <span class="bench-title">🪑 미배치 <span class="bench-count">${benchPlayers.length}</span></span>
-        <span class="bench-hint">선수는 카드의 드롭다운으로 선택 · 카드를 끌면 위치 자유 조정 · 칩의 숫자는 참여/목표 쿼터</span>
+        <span class="bench-title">${q} 벤치 <span class="bench-count">${benchPlayers.length}</span></span>
+        <span class="bench-hint">${pending ? `<strong>${escapeHtml(pending)}</strong> 선택됨 → 피치의 자리를 누르세요` : '선수를 누른 뒤 자리를 누르거나, 자리를 눌러 고르세요 · 숫자는 참여/목표'}</span>
       </div>
       <div class="bench-chips">${
             AppState.attendees.length === 0
-                ? '<span class="empty-hint">참석자를 먼저 선택하세요.</span>'
-                : (chips || '<span class="empty-hint">모든 참석자가 배치되었습니다. ⚽</span>')
+                ? '<span class="empty-hint">참석자를 먼저 체크하세요.</span>'
+                : (chips || '<span class="empty-hint">모두 배치됐습니다.</span>')
         }</div>${extraHtml}`;
+        bench.querySelectorAll('.bench-chip').forEach(chip => chip.addEventListener('click', () => {
+            if (!checkEditorAccess()) return;
+            AppState.pendingPick = AppState.pendingPick === chip.dataset.name ? null : chip.dataset.name;
+            renderFormationBuilder();
+        }));
         bench.querySelectorAll('.extra-sub-del').forEach(btn => btn.addEventListener('click', () => {
             AppState.extraSubs[q].splice(parseInt(btn.dataset.idx, 10), 1);
             fbRefresh();
         }));
-    }
-
-    // 선수 드롭다운 옵션 (다른 포지션 주전/교체로 배정된 선수 제외)
-    function buildOptions(pos, type) {
-        const current = type === 'main' ? (fMap[pos] || '-') : (fSubs[pos] || '-');
-        const assignedOther = new Set();
-        for (const [p, player] of Object.entries(fMap)) {
-            if (p !== pos && player && player !== '-') assignedOther.add(player);
-        }
-        for (const [p, s] of Object.entries(fSubs)) {
-            if (p !== pos && s && s !== '-') assignedOther.add(s);
-        }
-        // 참석자 목록에 없는 이름이 배정돼 있으면(이관 기록 등) 옵션에 유지
-        const pool = [...AppState.attendees];
-        if (current !== '-' && !pool.includes(current)) pool.push(current);
-        const opts = pool.filter(n => {
-            if (n === current) return true;
-            if (assignedOther.has(n)) return false;
-            if (type === 'sub') return n !== (fMap[pos] || '');
-            return true;
-        });
-        const optionHtml = opts.map(n =>
-            `<option value="${escapeHtml(n)}" ${n === current ? 'selected' : ''}>${escapeHtml(formatPlayerName(n))}</option>`
-        ).join('');
-        const noneLabel = type === 'main' ? '선택' : '교체 없음';
-        return `<option value="-" ${current === '-' ? 'selected' : ''}>${noneLabel}</option>${optionHtml}`;
     }
 
     const locks = AppState.locks[q] || {};
@@ -441,25 +440,26 @@ function renderFormationBuilder() {
         const label = (POSITION_DISPLAY_LABELS[fType] || {})[pos] || pos;
         const coord = getPosCoord(q, pos, fType);
         const rowKey = getPosRowKey(pos, fType);
-        const hasSub = fSubs[pos] && fSubs[pos] !== '-';
-        const filled = fMap[pos] && fMap[pos] !== '-';
-        const locked = !!locks[pos] && filled;
+        const name = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
+        const sub = fSubs[pos] && fSubs[pos] !== '-' ? fSubs[pos] : null;
+        const locked = !!locks[pos] && !!name;
         const r = reasons[pos];
-        const reasonHtml = (filled && r && r.name === fMap[pos] && !locked)
-            ? `<span class="pos-reason pos-reason-${escapeHtml(r.reason)}" title="자동 초안 근거: ${escapeHtml(AutoDraft.reasonLabel(r))}">${escapeHtml(AutoDraft.reasonLabel(r))}</span>` : '';
+        const reasonHtml = (name && r && r.name === name && !locked)
+            ? `<span class="pos-reason pos-reason-${escapeHtml(r.reason)}">${escapeHtml(AutoDraft.reasonLabel(r))}</span>` : '';
+        const p = name && t ? t.participation[name] : null;
+        const creditHtml = name && t ? `<span class="pos-credit ${t.status[name] || ''}">${fmtQ(p ? p.credit : 0)}</span>` : '';
         return `
-      <div class="pos-cell ${filled ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''} ${locked ? 'is-locked' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
-        <button type="button" class="pos-lock-toggle ${locked ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="${locked ? '잠금 해제 (자동 초안이 바꿀 수 있음)' : '이 자리 잠그기 (자동 초안이 유지)'}" aria-label="자리 잠금">${locked ? '🔒' : '🔓'}</button>
-        <button type="button" class="pos-sub-toggle ${hasSub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정/해제" aria-label="교체 선수 지정">⇄</button>
+      <div class="pos-cell ${name ? 'is-filled' : 'is-empty'} ${sub ? 'has-sub' : ''} ${locked ? 'is-locked' : ''} ${pending ? 'is-target' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
+        <button type="button" class="pos-lock-toggle ${locked ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="${locked ? '잠금 해제' : '이 자리 잠그기 (자동 초안이 유지)'}" aria-label="자리 잠금">${locked ? '🔒' : '🔓'}</button>
+        <button type="button" class="pos-sub-toggle ${sub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정" aria-label="교체 선수 지정">⇄</button>
         <div class="pos-badge pos-badge-${rowKey}" title="드래그하여 위치 이동">${escapeHtml(label)}</div>
-        <select class="pos-main-sel" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수">${buildOptions(pos, 'main')}</select>
+        <button type="button" class="pos-name ${name ? '' : 'empty'}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수 선택">${name ? escapeHtml(name) : '+ 선택'}${creditHtml}</button>
+        ${sub ? `<button type="button" class="pos-sub-line" data-pos="${escapeHtml(pos)}" title="교체 변경">⇄ ${escapeHtml(sub)}</button>` : ''}
         ${reasonHtml}
-        <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildOptions(pos, 'sub')}</select>
       </div>`;
     }
 
     const positionsHtml = getFormationPositions(q, fType).map(pos => buildPosCell(pos)).join('');
-
     container.innerHTML = `
     <div class="pitch-title">FC BARZA · ${escapeHtml(q)} · ${escapeHtml(fType)}</div>
     <div class="pitch-lines"></div>
@@ -468,11 +468,20 @@ function renderFormationBuilder() {
     <div class="pitch-penalty-bottom"></div>
     ${positionsHtml}`;
 
-    container.querySelectorAll('.pos-sub-sel').forEach(sel => {
-        sel.addEventListener('change', () => fbApplySub(q, sel.dataset.pos, sel.value));
-        sel.addEventListener('pointerdown', e => e.stopPropagation());
+    // 자리 누름: 대기 선수가 있으면 바로 배치, 없으면 선택 시트
+    container.querySelectorAll('.pos-name').forEach(btn => {
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('click', () => {
+            const pos = btn.dataset.pos;
+            if (!checkEditorAccess()) return;
+            if (AppState.pendingPick) { placePending(q, pos); return; }
+            openPickSheet(q, pos, 'main');
+        });
     });
-
+    container.querySelectorAll('.pos-sub-line').forEach(btn => {
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('click', () => { if (checkEditorAccess()) openPickSheet(q, btn.dataset.pos, 'sub'); });
+    });
     container.querySelectorAll('.pos-lock-toggle').forEach(btn => {
         btn.addEventListener('pointerdown', e => e.stopPropagation());
         btn.addEventListener('click', () => {
@@ -483,34 +492,21 @@ function renderFormationBuilder() {
             renderFormationBuilder();
         });
     });
-
     container.querySelectorAll('.pos-sub-toggle').forEach(btn => {
         btn.addEventListener('pointerdown', e => e.stopPropagation());
         btn.addEventListener('click', () => {
             const pos = btn.dataset.pos;
-            const cell = btn.closest('.pos-cell');
-            const subSel = container.querySelector(`.pos-sub-sel[data-pos="${CSS.escape(pos)}"]`);
-            const turningOn = !btn.classList.contains('active');
-            if (turningOn) {
-                btn.classList.add('active');
-                if (cell) cell.classList.add('has-sub');
-                if (subSel) { subSel.classList.add('show'); subSel.focus(); }
-            } else {
-                fbApplySub(q, pos, '-');
-            }
+            if (!checkEditorAccess()) return;
+            if (!fMap[pos] || fMap[pos] === '-') { showToast('주전 선수를 먼저 배치하세요.', 'error'); return; }
+            openPickSheet(q, pos, 'sub');
         });
-    });
-
-    container.querySelectorAll('.pos-main-sel').forEach(sel => {
-        sel.addEventListener('change', () => fbApplyMain(q, sel.dataset.pos, sel.value));
-        sel.addEventListener('pointerdown', e => e.stopPropagation());
     });
 
     // ── 포지션 카드 자유 이동 (전술 보드처럼 드래그) ──
     container.querySelectorAll('.pos-cell').forEach(cell => {
         cell.addEventListener('pointerdown', e => {
             if (e.button !== undefined && e.button !== 0) return;
-            if (e.target.closest('select, .pos-sub-toggle')) return;
+            if (e.target.closest('button')) return;
 
             const pos = cell.dataset.pos;
             const rect = container.getBoundingClientRect();
@@ -530,7 +526,6 @@ function renderFormationBuilder() {
                 cell.style.top = top.toFixed(1) + '%';
                 ev.preventDefault();
             };
-
             const finish = () => {
                 cell.removeEventListener('pointermove', onMove);
                 cell.removeEventListener('pointerup', onUp);
@@ -538,25 +533,106 @@ function renderFormationBuilder() {
                 try { cell.releasePointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
                 cell.classList.remove('dragging');
             };
-
             const onUp = () => {
                 finish();
                 if (moved) {
                     if (!AppState.formationCoords[q]) AppState.formationCoords[q] = {};
-                    AppState.formationCoords[q][pos] = {
-                        left: parseFloat(cell.style.left),
-                        top: parseFloat(cell.style.top),
-                    };
-                    renderFormationOverview();
+                    AppState.formationCoords[q][pos] = { left: parseFloat(cell.style.left), top: parseFloat(cell.style.top) };
+                } else if (AppState.pendingPick && checkEditorAccess()) {
+                    placePending(q, pos); // 카드 아무 곳이나 탭해도 대기 선수 배치
                 }
             };
-
             try { cell.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 등 */ }
             cell.addEventListener('pointermove', onMove);
             cell.addEventListener('pointerup', onUp);
             cell.addEventListener('pointercancel', onUp);
         });
     });
+}
+
+// 대기 선수(벤치에서 누른 선수)를 자리에 배치 — 자리에 있던 선수는 벤치로
+function placePending(q, pos) {
+    const name = AppState.pendingPick;
+    AppState.pendingPick = null;
+    if (!name) return;
+    const fMap = AppState.formationState[q];
+    // 같은 선수가 다른 자리에 있으면 그 자리를 비움
+    Object.keys(fMap).forEach(p => { if (fMap[p] === name) delete fMap[p]; });
+    fMap[pos] = name;
+    fbRefresh();
+}
+
+// ── 선수 선택 시트 (하단 시트) ─────────────────────────────────────────────
+function openPickSheet(q, pos, mode) {
+    const sheet = document.getElementById('pick-sheet');
+    const body = document.getElementById('pick-sheet-body');
+    if (!sheet || !body) return;
+    const fType = AppState.formationTypes[q];
+    const label = (POSITION_DISPLAY_LABELS[fType] || {})[pos] || pos;
+    const fMap = AppState.formationState[q];
+    const fSubs = AppState.formationSubs[q];
+    const current = mode === 'sub' ? (fSubs[pos] || null) : (fMap[pos] || null);
+    const t = AppState.attendees.length ? editorTargets() : null;
+    const assignedMain = new Set(Object.values(fMap).filter(Boolean));
+    const assignedSub = new Set(Object.values(fSubs).filter(Boolean));
+    const benchNames = AppState.attendees.filter(n => !assignedMain.has(n) && !assignedSub.has(n));
+    const prefs = n => ((getPlayer(n) || {}).positions || []);
+    const fit = n => AutoDraft.fitDetail(prefs(n), pos);
+    const sortByFit = names => [...names].sort((a, b) => fit(b).score - fit(a).score || ((t && t.participation[a]) ? t.participation[a].credit : 0) - ((t && t.participation[b]) ? t.participation[b].credit : 0) || a.localeCompare(b, 'ko'));
+
+    const chip = (n, extraCls = '') => {
+        const p = t ? t.participation[n] : null;
+        const credit = p ? p.credit : 0;
+        const st = t ? (credit === 0 ? 'unplayed' : t.status[n]) : '';
+        const f = fit(n);
+        const fitLabel = f.score >= 2.5 ? AutoDraft.reasonLabel(f) : (f.score > 0 ? AutoDraft.reasonLabel(f) : '');
+        return `<button type="button" class="pick-chip ${st} ${extraCls} ${n === current ? 'current' : ''}" data-name="${escapeHtml(n)}">
+          <span class="pick-name">${escapeHtml(n)}${isGuest(n) ? '<small>용병</small>' : ''}</span>
+          <span class="pick-meta">${prefs(n).slice(0, 2).join('·') || '-'}${fitLabel ? ` · <b>${escapeHtml(fitLabel)}</b>` : ''}</span>
+          <span class="pick-credit">${fmtQ(credit)}${t ? `/${fmtQ(t.target)}` : ''}</span>
+        </button>`;
+    };
+
+    let html = `<div class="pick-head">
+        <span class="pos-badge pos-badge-${getPosRowKey(pos, fType)}">${escapeHtml(label)}</span>
+        <span class="pick-title">${mode === 'sub' ? `교체 투입 선수 선택 <small>(${escapeHtml(fMap[pos] || '')} 아웃)</small>` : `${q} ${escapeHtml(label)} 선수 선택`}</span>
+        <button type="button" class="pick-close" data-close="1" aria-label="닫기">✕</button>
+      </div>`;
+    html += `<div class="pick-section"><div class="pick-section-title">벤치 <small>${benchNames.length}명 · 적합도순</small></div>
+        <div class="pick-list">${sortByFit(benchNames).map(n => chip(n)).join('') || '<span class="empty-hint">벤치에 선수가 없습니다.</span>'}</div></div>`;
+    if (mode === 'main') {
+        const others = Object.entries(fMap).filter(([p, n]) => n && p !== pos);
+        if (others.length) {
+            html += `<div class="pick-section"><div class="pick-section-title">자리 바꾸기 <small>배치된 선수와 교환</small></div>
+            <div class="pick-list">${others.map(([p, n]) => chip(n, 'swap')).map((h, i) => h.replace('data-name=', `data-swap-pos="${escapeHtml(others[i][0])}" data-name=`)).join('')}</div></div>`;
+        }
+    }
+    html += `<div class="pick-actions">
+        ${current ? `<button type="button" class="btn-cancel" data-clear="1">${mode === 'sub' ? '교체 해제' : '자리 비우기'}</button>` : ''}
+        <button type="button" class="btn-secondary" data-close="1">닫기</button>
+      </div>`;
+    body.innerHTML = html;
+    sheet.hidden = false;
+    document.body.classList.add('sheet-open');
+
+    const close = () => { sheet.hidden = true; document.body.classList.remove('sheet-open'); };
+    sheet.querySelectorAll('[data-close]').forEach(el => { el.onclick = close; });
+    const clearBtn = body.querySelector('[data-clear]');
+    if (clearBtn) clearBtn.onclick = () => { close(); if (mode === 'sub') fbApplySub(q, pos, '-'); else fbApplyMain(q, pos, '-'); };
+    body.querySelectorAll('.pick-chip').forEach(c => c.addEventListener('click', () => {
+        const name = c.dataset.name;
+        close();
+        if (mode === 'sub') { fbApplySub(q, pos, name); return; }
+        const swapPos = c.dataset.swapPos;
+        if (swapPos) {
+            const mine = fMap[pos] || null;
+            fMap[pos] = name;
+            if (mine) fMap[swapPos] = mine; else delete fMap[swapPos];
+            fbRefresh();
+            return;
+        }
+        fbApplyMain(q, pos, name);
+    }));
 }
 
 // ── 자동 초안 (선호 포지션 + 쿼터 균형) ──────────────────────────────────
@@ -908,6 +984,7 @@ function initTab1Events() {
         } else {
             document.getElementById('venue-custom-row').style.display = 'none';
             AppState.matchLocation = val;
+            renderMatchSummary();
         }
     });
 
@@ -927,29 +1004,44 @@ function initTab1Events() {
     });
     document.getElementById('match-opponent').addEventListener('input', e => {
         AppState.matchOpponent = e.target.value;
+        renderMatchSummary();
+        renderLiveRecorder();
     });
+    document.getElementById('match-date').addEventListener('change', () => renderMatchSummary());
 
     // 게스트 추가
     document.getElementById('add-guest-btn').addEventListener('click', async () => {
+        if (!checkEditorAccess()) return;
         const inp = document.getElementById('guest-name-input');
+        const posInp = document.getElementById('guest-pos-input');
         const name = inp.value.trim().replace(/\s+/g, '');
         if (!name) return;
-        if (!AppState.roster[name]) {
-            AppState.roster[name] = normalizePlayer(name, { role: 'guest', fullName: name.length >= 3 ? name : null });
+        const positions = parsePositionsInput(posInp ? posInp.value : '');
+        const existing = AppState.roster[name];
+        if (!existing) {
+            AppState.roster[name] = normalizePlayer(name, { role: 'guest', fullName: name.length >= 3 ? name : null, positions });
             try { await savePlayer(name); }
             catch (e) { showToast('용병 저장 실패: ' + e.message, 'error'); }
+        } else if (positions.length) {
+            // 이미 있는 선수인데 포지션을 적었으면 갱신
+            existing.positions = positions;
+            try { await savePlayer(name); }
+            catch (e) { showToast('포지션 저장 실패: ' + e.message, 'error'); }
         }
         if (!AppState.attendees.includes(name)) AppState.attendees.push(name);
         inp.value = '';
+        if (posInp) posInp.value = '';
         renderPlayerChecklist();
         renderSquadTable();
         renderPlaytimeStats();
         renderLiveRecorder();
         renderFormationBuilder();
-        showToast(`${name} (용병) 추가 완료!`);
+        renderMatchSummary();
+        showToast(`${name} (용병) 추가 완료!${positions.length ? ` · ${positions.join(', ')}` : ''}`);
     });
-    document.getElementById('guest-name-input').addEventListener('keydown', e => {
-        if (e.key === 'Enter') document.getElementById('add-guest-btn').click();
+    ['guest-name-input', 'guest-pos-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('add-guest-btn').click(); });
     });
 
     // 쿼터 수 / 출전 인원
@@ -1006,6 +1098,10 @@ function initTab1Events() {
             showToast('새 경기 준비 완료!');
         }
     });
+
+    // 좁은 화면에서는 경기 정보를 접어 두고 요약 줄만 보여줌
+    const infoDetails = document.querySelector('#step-info .info-details');
+    if (infoDetails && window.innerWidth < 700) infoDetails.open = false;
 
     startAutoSave();
     updateAutoSaveStatus();

@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=20261024a">
+  <link rel="stylesheet" href="css/style.css?v=20261024c">
 
   <!-- Firebase SDK (익명 인증 — DB 쓰기 권한 확보용) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -60,82 +60,82 @@
       <div id="role-notice"></div>
       <div id="edit-mode-notice"></div>
 
-      <!-- 경기 기본 정보 -->
-      <div class="card">
-        <div class="card-title">경기 정보</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="match-date">📅 경기 날짜</label>
-            <input type="date" id="match-date">
-          </div>
-          <div class="form-group">
-            <label for="match-location">📍 경기 장소</label>
-            <select id="match-location">
-              <option value="잠실유수지">잠실유수지</option>
-              <option value="탄천유수지">탄천유수지</option>
-              <option value="송파여성축구장">송파여성축구장</option>
-              <option value="천마축구장">천마축구장</option>
-              <option value="__custom__">+ 다른 경기장 추가...</option>
-            </select>
-            <div id="venue-custom-row" style="display:none; margin-top:0.4rem; display:flex; gap:0.4rem">
-              <input type="text" id="venue-custom-input" placeholder="경기장 이름 입력">
-              <button id="venue-add-btn" class="btn-secondary" style="white-space:nowrap">추가</button>
+      <!-- 고정 요약 바 (JS 렌더링) -->
+      <div id="match-summary" class="match-summary"></div>
+
+      <!-- 경기 정보 -->
+      <section class="card step-card" id="step-info">
+        <details class="info-details" open>
+          <summary class="step-title"><span class="step-num">0</span>경기 정보 <span id="info-summary-text" class="step-summary"></span></summary>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="match-date">경기 날짜</label>
+              <input type="date" id="match-date">
+            </div>
+            <div class="form-group">
+              <label for="match-location">경기 장소</label>
+              <select id="match-location">
+                <option value="잠실유수지">잠실유수지</option>
+                <option value="탄천유수지">탄천유수지</option>
+                <option value="송파여성축구장">송파여성축구장</option>
+                <option value="천마축구장">천마축구장</option>
+                <option value="__custom__">+ 다른 경기장 추가...</option>
+              </select>
+              <div id="venue-custom-row" style="display:none; margin-top:0.4rem; display:flex; gap:0.4rem">
+                <input type="text" id="venue-custom-input" placeholder="경기장 이름 입력">
+                <button id="venue-add-btn" class="btn-secondary" style="white-space:nowrap">추가</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="match-opponent">상대팀</label>
+              <input type="text" id="match-opponent" value="상대팀" placeholder="예: 청팀">
+            </div>
+            <div class="form-group form-group-narrow">
+              <label for="match-quarter-count">쿼터 수</label>
+              <select id="match-quarter-count">
+                <option value="4">4쿼터</option>
+                <option value="5">5쿼터</option>
+              </select>
+            </div>
+            <div class="form-group form-group-narrow">
+              <label for="match-on-field">쿼터당 출전</label>
+              <select id="match-on-field">
+                <option value="11">11명</option>
+                <option value="10">10명</option>
+                <option value="9">9명</option>
+                <option value="8">8명</option>
+                <option value="7">7명</option>
+              </select>
             </div>
           </div>
-          <div class="form-group">
-            <label for="match-opponent">🆚 상대팀</label>
-            <input type="text" id="match-opponent" value="상대팀" placeholder="예: 청팀">
-          </div>
-          <div class="form-group form-group-narrow">
-            <label for="match-quarter-count">⏱️ 쿼터 수</label>
-            <select id="match-quarter-count">
-              <option value="4">4쿼터</option>
-              <option value="5">5쿼터</option>
-            </select>
-          </div>
-          <div class="form-group form-group-narrow">
-            <label for="match-on-field">👕 쿼터당 출전</label>
-            <select id="match-on-field">
-              <option value="11">11명</option>
-              <option value="10">10명</option>
-              <option value="9">9명</option>
-              <option value="8">8명</option>
-              <option value="7">7명</option>
-            </select>
-          </div>
-        </div>
-        <p class="hint-text" style="margin:0.4rem 0 0">목표 쿼터 = 쿼터당 출전 인원 × 쿼터 수 ÷ 참석자 수 (예: 11명 × 4쿼터, 14명 참석 → 3.14쿼터)</p>
-      </div>
+          <p class="hint-text" style="margin:0.4rem 0 0">목표 쿼터 = 쿼터당 출전 인원 × 쿼터 수 ÷ 참석자 수</p>
+        </details>
+      </section>
 
-      <!-- 참석자 & 포메이션 2컬럼 -->
       <div class="match-main-layout">
 
-        <!-- 왼쪽: 참석자 -->
+        <!-- 1. 참석 -->
         <div>
-          <div class="card">
-            <div class="card-title">1. 참석자 선택</div>
-            <div class="guest-add-row">
-              <input type="text" id="guest-name-input" class="editor-only" placeholder="게스트(용병) 이름">
-              <button id="add-guest-btn" class="btn-secondary editor-only">+ 추가</button>
+          <section class="card step-card" id="step-attend">
+            <div class="step-title"><span class="step-num">1</span>참석 체크 <span id="attend-summary-text" class="step-summary"></span></div>
+            <div class="attend-tools">
+              <input type="search" id="attend-filter" placeholder="이름 검색" autocomplete="off">
+              <div class="guest-add-row">
+                <input type="text" id="guest-name-input" class="editor-only" placeholder="용병 이름">
+                <input type="text" id="guest-pos-input" class="editor-only" placeholder="선호 포지션 (예: ST, LW)" title="우선순위 순으로 쉼표 구분">
+                <button id="add-guest-btn" class="btn-secondary editor-only">+ 용병</button>
+              </div>
             </div>
             <div id="player-checklist" class="player-checklist">
               <p class="empty-hint" style="padding:0.5rem">명단을 불러오는 중...</p>
             </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title">쿼터별 출전 현황 <small class="hint-text">(포메이션 배치에서 자동 계산 · 교체 0.5)</small></div>
-            <div id="squad-table-container">
-              <p class="empty-hint">참석자를 선택하세요.</p>
-            </div>
-            <div id="playtime-stats"></div>
-          </div>
+          </section>
         </div>
 
-        <!-- 오른쪽: 포메이션 빌더 -->
+        <!-- 2. 배치 -->
         <div>
-          <div class="card">
-            <div class="card-title">2. 포메이션 배치</div>
+          <section class="card step-card" id="step-lineup">
+            <div class="step-title"><span class="step-num">2</span>포메이션 배치</div>
 
             <div class="formation-header">
               <div class="formation-header-left">
@@ -154,48 +154,54 @@
             </div>
 
             <div class="draft-toolbar">
-              <button id="auto-draft-btn" class="btn-secondary editor-only" type="button" title="참석자의 선호 포지션과 쿼터 균형을 반영해 전 쿼터 라인업 초안을 만듭니다">✨ 자동 초안 만들기</button>
-              <span class="hint-text">선호 포지션 + 쿼터 균형으로 전 쿼터 배치 · 🔒 잠근 자리는 유지 · 다시 누르면 다른 조합</span>
+              <button id="auto-draft-btn" class="btn-secondary editor-only" type="button" title="참석자의 선호 포지션과 쿼터 균형을 반영해 전 쿼터 라인업 초안을 만듭니다">✨ 자동 초안</button>
+              <span class="hint-text">선호 포지션 + 쿼터 균형 · 🔒 잠근 자리 유지 · 다시 누르면 다른 조합</span>
             </div>
 
-            <div id="formation-bench" class="formation-bench">
-              <!-- 미배치 참석자 벤치 (JS에서 렌더링) -->
-            </div>
+            <div id="formation-bench" class="formation-bench"></div>
 
-            <div id="formation-builder">
-              <!-- 피치 라인 요소 (JS에서 동적으로 추가) -->
-            </div>
+            <div id="formation-builder"></div>
 
-            <div class="export-formation-row">
-              <button id="export-formation-btn" class="btn-secondary" style="margin-top:0.75rem">
-                📸 전체 쿼터 포메이션 다운로드
-              </button>
-            </div>
-          </div>
+            <details class="squad-details" id="squad-details">
+              <summary><span>출전 현황</span><span id="squad-summary-text" class="step-summary"></span></summary>
+              <div id="playtime-stats"></div>
+              <div id="squad-table-container"><p class="empty-hint">참석자를 선택하세요.</p></div>
+            </details>
 
-          <!-- 전체 쿼터 미리보기 -->
-          <div class="formation-overview-panel" style="margin-top:0.75rem">
-            <h4>📋 전체 쿼터 포메이션 개요</h4>
-            <div class="overview-grid" id="overview-grid"><!-- 쿼터별 캔버스 (JS에서 렌더링) --></div>
-          </div>
+            <div class="quarter-strip-head">
+              <span class="quarter-strip-title">전체 쿼터 요약</span>
+              <button id="export-formation-btn" class="btn-secondary btn-sm">📸 이미지 저장</button>
+            </div>
+            <div id="quarter-strip" class="quarter-strip"></div>
+          </section>
         </div>
       </div>
 
-      <!-- 실시간 기록 + 저장 -->
-      <div class="card">
-        <div class="card-title">3. 실시간 기록</div>
+      <!-- 3. 기록 -->
+      <section class="card step-card" id="step-record">
+        <div class="step-title"><span class="step-num">3</span>실시간 기록</div>
         <div id="live-recorder"></div>
-      </div>
+      </section>
 
-      <div class="card">
-        <div class="card-title">4. 저장</div>
+      <!-- 4. 저장 -->
+      <section class="card step-card" id="step-save">
+        <div class="step-title"><span class="step-num">4</span>저장</div>
         <div id="autosave-status" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem"></div>
         <div class="save-buttons-row">
-          <button id="new-match-btn" class="editor-only">🔄 새 경기</button>
-          <button id="draft-save-btn" class="editor-only">💾 임시 저장 (Draft)</button>
-          <button id="final-save-btn" class="btn-primary editor-only">✅ 확정 저장 (통계 반영)</button>
+          <button id="new-match-btn" class="editor-only">새 경기</button>
+          <button id="draft-save-btn" class="editor-only">임시 저장</button>
+          <button id="final-save-btn" class="btn-primary editor-only">확정 저장 (통계 반영)</button>
         </div>
         <div id="duplicate-warning" style="display:none"></div>
+      </section>
+
+      <!-- 선수 선택 시트 (JS 렌더링) -->
+      <div id="pick-sheet" class="pick-sheet" hidden>
+        <div class="pick-sheet-backdrop" data-close="1"></div>
+        <div class="pick-sheet-panel" role="dialog" aria-modal="true">
+          <div class="pick-sheet-handle"></div>
+          <div id="pick-sheet-body"></div>
+        </div>
       </div>
     </div>
 
@@ -238,16 +244,16 @@
   <div id="toast-container"></div>
 
   <!-- ========== SCRIPTS ========== -->
-  <script src="js/config.js?v=20261024a"></script>
-  <script src="js/quota.js?v=20261024a"></script>
-  <script src="js/autodraft.js?v=20261024a"></script>
-  <script src="js/app.js?v=20261024a"></script>
-  <script src="js/drive.js?v=20261024a"></script>
-  <script src="js/formation.js?v=20261024a"></script>
-  <script src="js/tab1_match.js?v=20261024a"></script>
-  <script src="js/tab2_stats.js?v=20261024a"></script>
-  <script src="js/tab3_history.js?v=20261024a"></script>
-  <script src="js/tab4_roster.js?v=20261024a"></script>
+  <script src="js/config.js?v=20261024c"></script>
+  <script src="js/quota.js?v=20261024c"></script>
+  <script src="js/autodraft.js?v=20261024c"></script>
+  <script src="js/app.js?v=20261024c"></script>
+  <script src="js/drive.js?v=20261024c"></script>
+  <script src="js/formation.js?v=20261024c"></script>
+  <script src="js/tab1_match.js?v=20261024c"></script>
+  <script src="js/tab2_stats.js?v=20261024c"></script>
+  <script src="js/tab3_history.js?v=20261024c"></script>
+  <script src="js/tab4_roster.js?v=20261024c"></script>
 
 </body>
 

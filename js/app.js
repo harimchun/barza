@@ -90,6 +90,7 @@ const AppState = {
     formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: inName } } — out 선수는 formationState[q][pos]
     formationCoords: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: {left,top}% } } 카드 자유 배치 오버라이드
     extraSubs: { '1Q': [], '2Q': [], '3Q': [], '4Q': [] },      // 포지션을 특정할 수 없는 교체 쌍 [{in,out}] (시트 이관분)
+    pendingPick: null,  // 벤치에서 누른 선수 (다음에 누르는 자리에 배치)
     locks: {},          // { q: { pos: true } } 자동 초안이 건드리지 않는 자리
     draftReasons: {},   // { q: { pos: { name, reason, rank, score } } } 자동 초안 배치 근거
     draftSeed: 0,
@@ -264,6 +265,7 @@ function resetMatchState() {
     AppState.formationCoords = {};
     AppState.extraSubs = {};
     AppState.quarterScores = {};
+    AppState.pendingPick = null;
     AppState.locks = {};
     AppState.draftReasons = {};
     AppState.draftSeed = 0;
