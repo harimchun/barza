@@ -7,8 +7,11 @@ Phase 0에서 정리한 구조. 쓰기는 항상 레코드 단위(`/matches/{id}
 /roster/{name}              선수 1명
 /matches/{matchId}          경기 1건
 /settings/venues            ["잠실유수지", "탄천유수지", ...]
-/settings/edit_passcode     편집 암호 SHA-256 해시
+/settings/editors/{emailKey}      편집 가능한 구글 계정 { email, name, addedAt, addedBy }
+/settings/editorRequests/{uid}    편집 권한 요청 { email, name, requestedAt }
 /settings/schemaVersion     2
+
+emailKey = 소문자 이메일의 '.' 을 ',' 로 바꾼 값 (Firebase 키 제약). DB 규칙은 auth.token.email 을 같은 식으로 변환해 editors 에 있는지 검사한다 (README 3단계).
 ```
 
 ## 선수 `/roster/{name}`

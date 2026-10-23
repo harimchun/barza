@@ -64,10 +64,13 @@ const DEFAULT_VENUES = ['잠실유수지', '탄천유수지', '송파여성축�
 
 // 앱 전역 상태
 const AppState = {
-    // 편집 권한 (공유 암호 기반)
-    isSignedIn: false,
-    isEditor: false,            // true면 편집 모드 (암호로 잠금 해제됨)
-    editPasscodeHash: null,     // DB에 저장된 편집 암호 해시 (없으면 null = 미설정)
+    // 편집 권한 (구글 로그인 + 편집자 허용 목록)
+    isSignedIn: false,          // 데이터 로드 완료 여부
+    isEditor: false,            // true면 편집 모드 (로그인 계정이 편집자 목록에 있음)
+    user: null,                 // { uid, email, displayName } | null
+    editors: {},                // /settings/editors
+    editorRequests: {},         // /settings/editorRequests
+    pendingAuthUser: undefined, // 데이터 로드 전에 도착한 로그인 상태
 
     // 데이터
     roster: {},    // { name: { name, fullName, role, positions, jerseyNo, aliases, active } }
@@ -322,6 +325,12 @@ async function initApp() {
     });
 
     initTab1Events();
+    const signOutBtn = document.getElementById('auth-signout');
+    if (signOutBtn) signOutBtn.addEventListener('click', () => { signOutGoogle(); });
+    document.addEventListener('click', e => {
+        const menu = document.getElementById('auth-menu');
+        if (menu && menu.style.display !== 'none' && !e.target.closest('.auth-wrap')) menu.style.display = 'none';
+    });
     AppState.venues = [...DEFAULT_VENUES];
     populateVenueSelect();
 

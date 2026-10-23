@@ -8,7 +8,8 @@ FC 바르자 스프레드시트 → 앱 데이터 이관 스크립트
   <export.xlsx> : 구글 시트를 "파일 > 다운로드 > Microsoft Excel(.xlsx)"로 받은 파일
                   (또는 https://docs.google.com/spreadsheets/d/<ID>/export?format=xlsx)
   --out         : 결과 JSON을 쓸 폴더 (roster.json, matches.json, venues.json, report.md)
-  --upload      : 결과를 Firebase Realtime Database에 업로드 (익명 인증 사용, 전체 덮어쓰기)
+  --upload      : 결과를 Firebase Realtime Database에 업로드 (전체 덮어쓰기, --id-token 필요)
+  --id-token    : 편집자 구글 계정의 Firebase ID 토큰 (앱 콘솔: await firebase.auth().currentUser.getIdToken())
   --backup      : 업로드 전 현재 DB 내용을 <out>/backup-<timestamp>.json 으로 저장
 
 읽는 것:
@@ -492,6 +493,8 @@ def main():
     ap.add_argument('--backup', action='store_true')
     ap.add_argument('--db-url', default=None)
     ap.add_argument('--api-key', default=None)
+    ap.add_argument('--id-token', default=None,
+                    help='편집자 구글 계정의 Firebase ID 토큰 (앱 콘솔에서 await firebase.auth().currentUser.getIdToken())')
     args = ap.parse_args()
 
     if linear_sum_assignment is None:
@@ -784,10 +787,12 @@ def upload(args, roster, matches, venues):
         with urllib.request.urlopen(r) as resp:
             return json.loads(resp.read() or b'null')
 
-    # 익명 로그인 (앱과 동일한 방식) → idToken
-    auth = req(f'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={api_key}', 'POST',
-               {'returnSecureToken': True})
-    token = auth['idToken']
+    # DB 쓰기 규칙이 편집자(구글 계정)만 허용하므로, 앱에서 로그인한 편집자의 ID 토큰이 필요하다.
+    #   앱을 연 브라우저 콘솔에서:  await firebase.auth().currentUser.getIdToken()
+    token = args.id_token or os.environ.get('BARZA_ID_TOKEN')
+    if not token:
+        sys.exit('--id-token 이 필요합니다. 앱에 편집자 계정으로 로그인한 뒤 브라우저 콘솔에서 '
+                 'await firebase.auth().currentUser.getIdToken() 값을 복사해 넘기세요.')
 
     if args.backup:
         snap = req(f'{db_url}/.json')

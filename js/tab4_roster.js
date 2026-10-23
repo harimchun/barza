@@ -91,9 +91,9 @@ function renderRosterTab() {
     </div>
 
     <div class="roster-section" style="margin-top:1rem">
-      <h3>⚙️ 편집 설정</h3>
-      <p class="hint-text">편집 암호를 아는 사람만 경기·명단을 수정할 수 있습니다. 정한 암호를 팀원에게 공유하세요.</p>
-      <button class="btn-secondary editor-only" data-action="change-passcode">🔑 편집 암호 변경</button>
+      <h3>⚙️ 편집 권한 (구글 계정)</h3>
+      <p class="hint-text">아래 목록에 있는 구글 계정으로 로그인한 사람만 경기·명단을 수정할 수 있습니다. 멤버의 구글 이메일을 추가하거나, 멤버가 보낸 권한 요청을 승인하세요.</p>
+      ${buildEditorsSection()}
     </div>`;
 
   container.onclick = e => {
@@ -108,8 +108,13 @@ function renderRosterTab() {
     else if (action === 'edit') { AppState.rosterEditing = name; renderRosterTab(); }
     else if (action === 'cancel-edit') { AppState.rosterEditing = null; renderRosterTab(); }
     else if (action === 'save-edit') savePlayerEdit(name, btn.closest('.roster-edit-form'));
-    else if (action === 'change-passcode') openChangePasscodeModal();
+    else if (action === 'add-editor') addEditorFromForm();
+    else if (action === 'remove-editor') removeEditorConfirm(btn.dataset.key);
+    else if (action === 'approve-request') handleEditorRequest(btn.dataset.uid, true);
+    else if (action === 'reject-request') handleEditorRequest(btn.dataset.uid, false);
   };
+  const editorInput = document.getElementById('new-editor-email');
+  if (editorInput) editorInput.addEventListener('keydown', e => { if (e.key === 'Enter') addEditorFromForm(); });
 
   document.getElementById('new-player-name').addEventListener('keydown', e => {
     if (e.key === 'Enter') addPlayer();
@@ -197,4 +202,79 @@ async function persistPlayer(name, successMsg) {
   }
   renderRosterTab();
   renderPlayerChecklist();
+}
+
+// ── 편집자(구글 계정) 관리 ─────────────────────────────────────────────────
+function buildEditorsSection() {
+  const editors = Object.entries(AppState.editors || {}).sort((a, b) => (a[1].email || '').localeCompare(b[1].email || ''));
+  const requests = Object.entries(AppState.editorRequests || {});
+  const me = AppState.user ? AppState.user.email : '';
+  const editorRows = editors.length
+    ? editors.map(([key, e]) => `
+        <li class="editor-item">
+          <span class="editor-mail">${escapeHtml(e.email)}${e.email === me ? ' <small>(나)</small>' : ''}${e.name ? ` <small>${escapeHtml(e.name)}</small>` : ''}</span>
+          <button class="btn-sm btn-delete-player editor-only" data-action="remove-editor" data-key="${escapeHtml(key)}" title="편집 권한 제거" ${editors.length === 1 ? 'disabled' : ''}>✕</button>
+        </li>`).join('')
+    : '<li class="empty-hint">아직 편집자가 없습니다. 처음 로그인하는 계정이 자동으로 편집자가 됩니다.</li>';
+  const requestRows = requests.length
+    ? `<h4 class="editor-sub">권한 요청 <span class="count-badge guest">${requests.length}</span></h4>
+       <ul class="editor-list">${requests.map(([uid, r]) => `
+        <li class="editor-item">
+          <span class="editor-mail">${escapeHtml(r.email || '')}${r.name ? ` <small>${escapeHtml(r.name)}</small>` : ''}</span>
+          <span class="editor-actions">
+            <button class="btn-sm btn-promote editor-only" data-action="approve-request" data-uid="${escapeHtml(uid)}">승인</button>
+            <button class="btn-sm btn-demote editor-only" data-action="reject-request" data-uid="${escapeHtml(uid)}">거절</button>
+          </span>
+        </li>`).join('')}</ul>`
+    : '';
+  return `
+      <ul class="editor-list">${editorRows}</ul>
+      <div class="roster-add-form" style="margin-top:0.6rem">
+        <input type="email" id="new-editor-email" class="editor-only" placeholder="멤버 구글 이메일 (예: name@gmail.com)">
+        <input type="text" id="new-editor-name" class="editor-only" placeholder="이름 (선택)" style="max-width:140px">
+        <button class="btn-primary editor-only" data-action="add-editor">편집자 추가</button>
+      </div>
+      ${requestRows}`;
+}
+
+async function addEditorFromForm() {
+  if (!checkEditorAccess()) return;
+  const email = (document.getElementById('new-editor-email').value || '').trim();
+  const name = (document.getElementById('new-editor-name').value || '').trim();
+  if (!email) return;
+  try {
+    await addEditor(email, name, AppState.user ? AppState.user.email : '');
+    showToast(`${email} 계정에 편집 권한을 주었습니다.`);
+  } catch (e) {
+    showToast('편집자 추가 실패: ' + e.message, 'error');
+  }
+  renderRosterTab();
+}
+
+async function removeEditorConfirm(key) {
+  if (!checkEditorAccess()) return;
+  const e = AppState.editors[key];
+  if (!e) return;
+  const mine = AppState.user && e.email === AppState.user.email;
+  if (!confirm(`${e.email} 계정의 편집 권한을 제거할까요?${mine ? '\n(본인 계정입니다. 제거하면 바로 읽기 전용이 됩니다.)' : ''}`)) return;
+  try {
+    await removeEditor(key);
+    showToast('편집 권한을 제거했습니다.');
+    if (mine) await applyAuthState(window._fbAuth && window._fbAuth.currentUser);
+  } catch (err) {
+    showToast('제거 실패: ' + err.message, 'error');
+  }
+  renderRosterTab();
+}
+
+async function handleEditorRequest(uid, approve) {
+  if (!checkEditorAccess()) return;
+  const r = AppState.editorRequests[uid];
+  try {
+    await resolveEditorRequest(uid, approve);
+    showToast(approve ? `${r ? r.email : ''} 계정을 편집자로 승인했습니다.` : '요청을 거절했습니다.');
+  } catch (e) {
+    showToast('처리 실패: ' + e.message, 'error');
+  }
+  renderRosterTab();
 }

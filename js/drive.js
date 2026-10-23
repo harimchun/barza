@@ -1,12 +1,13 @@
 // =============================================
-// FC 바르자 팀 매니저 - Firebase / Auth 연동 (스키마 v2)
+// FC 바르자 팀 매니저 - Firebase / Auth 연동 (스키마 v2, 구글 로그인)
 // =============================================
 //
 // DB 구조 (v2):
 //   /roster/{name}            { name, fullName, role:'member'|'guest', positions:[], jerseyNo, aliases:[], active }
 //   /matches/{matchId}        경기 레코드 (docs/data-schema.md 참고)
 //   /settings/venues          ["잠실유수지", ...]
-//   /settings/edit_passcode   편집 암호 해시
+//   /settings/editors         편집 가능한 구글 계정 { emailKey: {email,name,...} }
+//   /settings/editorRequests  편집 권한 요청 { uid: {email,name,requestedAt} }
 //   /settings/schemaVersion   2
 //
 // 쓰기는 항상 레코드 단위(/matches/{id}, /roster/{name})로 하여 동시 편집 시 다른 레코드를 덮어쓰지 않는다.
@@ -15,7 +16,8 @@ const DB_NODES = {
     roster: '/roster.json',
     matches: '/matches.json',
     venues: '/settings/venues.json',
-    passcode: '/settings/edit_passcode.json',
+    editors: '/settings/editors.json',
+    editorRequests: '/settings/editorRequests.json',
     schemaVersion: '/settings/schemaVersion.json',
 };
 
@@ -29,7 +31,7 @@ function dbKey(s) {
     return String(s).replace(/[.$#[\]/]/g, '_');
 }
 
-// 현재 익명 사용자(또는 없음)의 ID 토큰 — 쓰기 요청에 첨부
+// 현재 로그인 사용자(또는 없음)의 ID 토큰 — 쓰기 요청에 첨부
 async function getIdToken() {
     try {
         const u = window._fbAuth && window._fbAuth.currentUser;
@@ -37,26 +39,40 @@ async function getIdToken() {
     } catch { return null; }
 }
 
-// ── 편집 암호 해시 (공유 암호 기반 편집 권한) ──────────────────────────────
-const EDIT_KEY_STORAGE = 'fc_barza_edit_key'; // localStorage: 마지막으로 통과한 암호 해시
-const PASSCODE_SALT = 'fc-barza-edit::';      // 해시 솔트(단순 레인보우 테이블 방지)
+// ── 편집 권한: 구글 로그인 + 편집자 허용 목록 ─────────────────────────────
+//
+//   /settings/editors/{emailKey}        { email, name, addedAt, addedBy }   ← 편집 가능한 구글 계정
+//   /settings/editorRequests/{uid}      { email, name, requestedAt }        ← 권한 요청 (편집자가 승인)
+//
+//   emailKey = 소문자 이메일에서 '.' 을 ',' 로 바꾼 것 (Firebase 키에 '.' 불가). DB 규칙도 같은 변환을 쓴다.
+//   편집자 목록이 비어 있으면 처음 로그인한 계정이 자동으로 첫 편집자가 된다 (부트스트랩).
 
-async function sha256Hex(text) {
-    const data = new TextEncoder().encode(PASSCODE_SALT + text);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+function emailKey(email) {
+    return String(email || '').trim().toLowerCase().replace(/\./g, ',');
 }
 
-// ── 헤더 편집 모드 UI ──────────────────────────────────────────────────────
+function isKakaoInAppBrowser() {
+    return /KAKAOTALK/i.test(navigator.userAgent);
+}
+
+// 카카오톡 인앱 브라우저에서는 구글 로그인 팝업이 막히므로 외부 브라우저로 여는 링크 제공
+function kakaoExternalUrl() {
+    return 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href.split('#')[0]);
+}
+
+// ── 헤더 로그인/편집 상태 UI ───────────────────────────────────────────────
 function updateEditModeUI(state) {
     const btn = document.getElementById('auth-btn');
     const status = document.getElementById('auth-status');
+    const menu = document.getElementById('auth-menu');
     if (!btn || !status) return;
 
     btn.className = 'auth-btn';
     btn.onclick = null;
     btn.disabled = false;
     btn.title = '';
+    if (menu) menu.style.display = 'none';
+    const u = AppState.user;
 
     switch (state) {
         case 'no-config':
@@ -79,149 +95,168 @@ function updateEditModeUI(state) {
             status.textContent = 'DB 연결 실패. 새로고침하거나 설정을 확인하세요.';
             break;
 
-        case 'locked':
-            btn.textContent = '🔓 편집 잠금 해제';
-            btn.onclick = openUnlockModal;
+        case 'signed-out':
+            btn.textContent = 'G 구글로 로그인';
+            btn.onclick = signInWithGoogle;
             status.textContent = '읽기 전용';
             break;
 
+        case 'no-access':
+            { const mu = document.getElementById('auth-menu-user'); if (mu && u) mu.textContent = `${u.email} · 권한 없음`; }
+            btn.textContent = '🙋 편집 권한 요청';
+            btn.classList.add('auth-warn');
+            btn.onclick = requestEditorAccess;
+            status.textContent = `${u ? u.email : ''} · 편집 권한 없음`;
+            if (menu) menu.style.display = '';
+            break;
+
+        case 'requested':
+            { const mu = document.getElementById('auth-menu-user'); if (mu && u) mu.textContent = `${u.email} · 승인 대기`; }
+            btn.textContent = '⏳ 승인 대기 중';
+            btn.disabled = true;
+            status.textContent = `${u ? u.email : ''} · 편집자 승인을 기다리는 중`;
+            if (menu) menu.style.display = '';
+            break;
+
         case 'unlocked':
-            btn.textContent = '🔒 편집 모드 (잠그기)';
+            btn.textContent = `✏️ ${u && (u.displayName || u.email)}`;
+            { const mu = document.getElementById('auth-menu-user'); if (mu && u) mu.textContent = `${u.email} · 편집 가능`; }
             btn.classList.add('auth-connected');
-            btn.onclick = lockEditing;
-            btn.title = '클릭하면 편집을 잠급니다';
+            btn.onclick = () => { if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none'; };
+            btn.title = '클릭하면 로그아웃 메뉴';
             status.textContent = '편집 모드';
+            if (menu) menu.style.display = 'none';
             break;
     }
 }
 
-// ── 잠금 / 해제 ────────────────────────────────────────────────────────────
-function unlockEditing(hash) {
-    AppState.isEditor = true;
-    if (hash) localStorage.setItem(EDIT_KEY_STORAGE, hash);
-    updateEditModeUI('unlocked');
-    updateEditButtonsVisibility();
-}
-
-function lockEditing() {
-    AppState.isEditor = false;
-    localStorage.removeItem(EDIT_KEY_STORAGE);
-    updateEditModeUI('locked');
-    updateEditButtonsVisibility();
-    showToast('편집 모드를 잠갔습니다. 🔒');
-}
-
-// ── 편집 암호 로드 / 저장 ──────────────────────────────────────────────────
-async function loadEditPasscode() {
+// ── 구글 로그인 / 로그아웃 ──────────────────────────────────────────────────
+async function signInWithGoogle() {
+    if (typeof firebase === 'undefined' || !window._fbAuth) {
+        showToast('Firebase 인증을 초기화하지 못했습니다. 새로고침해 주세요.', 'error');
+        return;
+    }
+    if (isKakaoInAppBrowser()) {
+        showKakaoNotice(true);
+        return;
+    }
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-        const v = await fbGet(DB_NODES.passcode);
-        AppState.editPasscodeHash = (typeof v === 'string' && v) ? v : null;
-    } catch {
-        AppState.editPasscodeHash = null;
+        await window._fbAuth.signInWithPopup(provider);
+    } catch (e) {
+        const code = e && e.code;
+        if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment'
+            || code === 'auth/cancelled-popup-request' || code === 'auth/web-storage-unsupported') {
+            try { await window._fbAuth.signInWithRedirect(provider); return; }
+            catch (e2) { showToast('로그인 실패: ' + (e2.message || e2), 'error'); return; }
+        }
+        if (code === 'auth/popup-closed-by-user') return;
+        if (code === 'auth/operation-not-allowed') {
+            showToast('Firebase 콘솔에서 Google 로그인 제공업체를 켜야 합니다.', 'error');
+            return;
+        }
+        showToast('로그인 실패: ' + (e.message || code || e), 'error');
     }
 }
 
-async function saveEditPasscode(hash) {
-    await fbPut(DB_NODES.passcode, hash);
-    AppState.editPasscodeHash = hash;
+async function signOutGoogle() {
+    try { await window._fbAuth.signOut(); }
+    catch (e) { showToast('로그아웃 실패: ' + e.message, 'error'); }
 }
 
-// ── 편집 암호 입력 모달 ────────────────────────────────────────────────────
-function openPasscodeModal({ title, desc, confirmLabel = '확인', onConfirm }) {
-    const overlay = document.getElementById('passcode-modal');
-    const input = document.getElementById('passcode-input');
-    const confirmBtn = document.getElementById('passcode-confirm');
-    const cancelBtn = document.getElementById('passcode-cancel');
-    if (!overlay || !input) return;
-
-    document.getElementById('passcode-modal-title').textContent = title;
-    document.getElementById('passcode-modal-desc').textContent = desc || '';
-    confirmBtn.textContent = confirmLabel;
-    input.value = '';
-    overlay.style.display = 'flex';
-    setTimeout(() => input.focus(), 50);
-
-    const cleanup = () => {
-        confirmBtn.onclick = null;
-        cancelBtn.onclick = null;
-        input.onkeydown = null;
-        overlay.onclick = null;
-    };
-    const close = () => { overlay.style.display = 'none'; cleanup(); };
-    const submit = async () => {
-        const val = input.value.trim();
-        if (!val) { showToast('암호를 입력하세요.', 'error'); return; }
-        confirmBtn.disabled = true;
-        let ok = false;
-        try { ok = await onConfirm(val); }
-        finally { confirmBtn.disabled = false; }
-        if (ok) close();
-    };
-
-    confirmBtn.onclick = submit;
-    cancelBtn.onclick = close;
-    input.onkeydown = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); submit(); }
-        else if (e.key === 'Escape') close();
-    };
-    overlay.onclick = (e) => { if (e.target === overlay) close(); };
+// ── 편집자 목록 / 권한 요청 ────────────────────────────────────────────────
+async function loadEditors() {
+    try {
+        const v = await fbGet(DB_NODES.editors);
+        AppState.editors = (v && typeof v === 'object') ? v : {};
+    } catch { AppState.editors = {}; }
+    try {
+        const r = await fbGet(DB_NODES.editorRequests);
+        AppState.editorRequests = (r && typeof r === 'object') ? r : {};
+    } catch { AppState.editorRequests = {}; }
 }
 
-function openUnlockModal() {
-    if (!AppState.editPasscodeHash) {
-        // 아직 암호가 없을 때 → 최초 설정
-        openPasscodeModal({
-            title: '편집 암호 설정',
-            desc: '팀과 공유할 편집 암호를 정하세요. 이 암호를 아는 사람은 누구나 경기를 기록·수정할 수 있습니다.',
-            confirmLabel: '설정하고 시작',
-            onConfirm: async (val) => {
-                try { await saveEditPasscode(await sha256Hex(val)); }
-                catch (e) { showToast('암호 저장 실패: ' + e.message, 'error'); return false; }
-                unlockEditing(AppState.editPasscodeHash);
-                showToast('편집 암호를 설정하고 편집 모드로 전환했습니다. ✏️');
-                return true;
-            },
-        });
+function isEditorEmail(email) {
+    return !!(email && AppState.editors && AppState.editors[emailKey(email)]);
+}
+
+async function addEditor(email, name, addedBy) {
+    const key = emailKey(email);
+    if (!key || !key.includes('@')) throw new Error('올바른 이메일이 아닙니다.');
+    const rec = { email: String(email).trim().toLowerCase(), name: name || '', addedAt: new Date().toISOString(), addedBy: addedBy || '' };
+    await fbPut(`/settings/editors/${encodeURIComponent(key)}.json`, rec);
+    AppState.editors[key] = rec;
+}
+
+async function removeEditor(key) {
+    await fbDelete(`/settings/editors/${encodeURIComponent(key)}.json`);
+    delete AppState.editors[key];
+}
+
+async function requestEditorAccess() {
+    const u = AppState.user;
+    if (!u) return;
+    try {
+        await fbPut(`/settings/editorRequests/${encodeURIComponent(u.uid)}.json`,
+            { email: (u.email || '').toLowerCase(), name: u.displayName || '', requestedAt: new Date().toISOString() });
+        AppState.editorRequests[u.uid] = { email: u.email, name: u.displayName || '' };
+        updateEditModeUI('requested');
+        showToast('편집 권한을 요청했습니다. 편집자가 승인하면 바로 사용할 수 있습니다.');
+    } catch (e) {
+        showToast('요청 실패: ' + e.message, 'error');
+    }
+}
+
+async function resolveEditorRequest(uid, approve) {
+    const req = AppState.editorRequests[uid];
+    if (!req) return;
+    if (approve) await addEditor(req.email, req.name, AppState.user ? AppState.user.email : '');
+    await fbDelete(`/settings/editorRequests/${encodeURIComponent(uid)}.json`);
+    delete AppState.editorRequests[uid];
+}
+
+// 로그인 상태가 바뀔 때마다 편집 권한 재평가
+async function applyAuthState(user) {
+    // 이메일 없는 계정(예전 익명 로그인 세션)은 편집 권한을 가질 수 없으므로 로그아웃 처리
+    if (user && !user.email) {
+        try { if (window._fbAuth && window._fbAuth.currentUser === user) await window._fbAuth.signOut(); } catch { /* ignore */ }
+        user = null;
+    }
+    AppState.user = user ? { uid: user.uid, email: (user.email || '').toLowerCase(), displayName: user.displayName || '' } : null;
+    if (!user) {
+        AppState.isEditor = false;
+        updateEditModeUI('signed-out');
+        updateEditButtonsVisibility();
+        return;
+    }
+    await loadEditors();
+    // 부트스트랩: 편집자가 아무도 없으면 첫 로그인 계정을 편집자로 등록
+    if (Object.keys(AppState.editors).length === 0 && AppState.user.email) {
+        try {
+            await addEditor(AppState.user.email, AppState.user.displayName, 'bootstrap');
+            showToast('첫 편집자로 등록되었습니다. 선수단 관리 → 편집 설정에서 다른 멤버를 추가하세요. 🎉');
+        } catch (e) {
+            console.warn('첫 편집자 등록 실패:', e);
+        }
+    }
+    if (isEditorEmail(AppState.user.email)) {
+        AppState.isEditor = true;
+        updateEditModeUI('unlocked');
     } else {
-        openPasscodeModal({
-            title: '편집 잠금 해제',
-            desc: '편집 암호를 입력하세요.',
-            confirmLabel: '잠금 해제',
-            onConfirm: async (val) => {
-                const hash = await sha256Hex(val);
-                if (hash === AppState.editPasscodeHash) {
-                    unlockEditing(hash);
-                    showToast('편집 모드로 전환했습니다. ✏️');
-                    return true;
-                }
-                showToast('암호가 올바르지 않습니다.', 'error');
-                return false;
-            },
-        });
+        AppState.isEditor = false;
+        updateEditModeUI(AppState.editorRequests[AppState.user.uid] ? 'requested' : 'no-access');
     }
-}
-
-// 편집 암호 변경 (편집 모드에서만 호출)
-function openChangePasscodeModal() {
-    if (!AppState.isEditor) { showToast('먼저 편집 잠금을 해제하세요.', 'error'); return; }
-    openPasscodeModal({
-        title: '편집 암호 변경',
-        desc: '새 편집 암호를 입력하세요. 변경하면 기존 암호로 잠금 해제한 다른 기기는 다시 잠깁니다.',
-        confirmLabel: '변경',
-        onConfirm: async (val) => {
-            try { await saveEditPasscode(await sha256Hex(val)); }
-            catch (e) { showToast('변경 실패: ' + e.message, 'error'); return false; }
-            unlockEditing(AppState.editPasscodeHash); // 현재 기기는 새 암호로 유지
-            showToast('편집 암호를 변경했습니다. 🔑');
-            return true;
-        },
-    });
+    updateEditButtonsVisibility();
+    if (document.getElementById('tab4').classList.contains('active')) renderRosterTab();
 }
 
 // ── 편집 권한 체크 (외부에서 호출) ───────────────────────────────────────
 function checkEditorAccess() {
     if (AppState.isEditor) return true;
-    showToast('🔒 편집하려면 먼저 "편집 잠금 해제"를 눌러 암호를 입력하세요.', 'error');
+    showToast(AppState.user
+        ? '🔒 편집 권한이 없습니다. 오른쪽 위 "편집 권한 요청"을 눌러 주세요.'
+        : '🔒 편집하려면 오른쪽 위에서 구글로 로그인하세요.', 'error');
     return false;
 }
 
@@ -234,9 +269,32 @@ const LOCAL_DATA_FILES = {
     [DB_NODES.venues]: 'data/import/venues.json',
 };
 
+// 로컬 모드 쓰기는 페이지 메모리의 JSON 트리에만 반영 (새로고침하면 사라짐)
+const LOCAL_TREE = {};
+function localPath(node) {
+    return decodeURIComponent(node.replace(/\.json$/, '')).split('/').filter(Boolean);
+}
+function localGet(node) {
+    let cur = LOCAL_TREE;
+    for (const seg of localPath(node)) {
+        if (cur === null || typeof cur !== 'object' || !(seg in cur)) return undefined;
+        cur = cur[seg];
+    }
+    return cur;
+}
+function localSet(node, value) {
+    const segs = localPath(node);
+    let cur = LOCAL_TREE;
+    segs.slice(0, -1).forEach(seg => { if (cur[seg] === null || typeof cur[seg] !== 'object') cur[seg] = {}; cur = cur[seg]; });
+    const last = segs[segs.length - 1];
+    if (value === undefined) delete cur[last]; else cur[last] = JSON.parse(JSON.stringify(value));
+}
+
 // ── Firebase REST API ──────────────────────────────────────────────────────
 async function fbGet(node) {
     if (LOCAL_DATA_MODE) {
+        const mem = localGet(node);
+        if (mem !== undefined) return mem;
         const file = LOCAL_DATA_FILES[node];
         if (!file) return null;
         const resp = await fetch(file + '?t=' + Date.now());
@@ -251,6 +309,9 @@ async function fbGet(node) {
 async function fbWrite(node, method, data) {
     if (LOCAL_DATA_MODE) {
         console.info(`[local-data] ${method} ${node}`, data);
+        if (method === 'DELETE') localSet(node, undefined);
+        else if (method === 'PATCH') localSet(node, Object.assign({}, localGet(node) || {}, data));
+        else localSet(node, data);
         return;
     }
     const token = await getIdToken();
@@ -262,7 +323,7 @@ async function fbWrite(node, method, data) {
     if (!resp.ok) {
         // 401/403이면 보통 익명 인증 미설정 또는 쓰기 규칙 문제
         const hint = (resp.status === 401 || resp.status === 403)
-            ? ' (Firebase 콘솔에서 "익명" 로그인 활성화 + 규칙 .write: "auth != null" 확인)'
+            ? ' (편집자로 등록된 구글 계정으로 로그인했는지, DB 규칙이 README 와 같은지 확인)'
             : '';
         throw new Error(`DB 쓰기 실패: ${resp.status}${hint}`);
     }
@@ -272,18 +333,20 @@ const fbPut = (node, data) => fbWrite(node, 'PUT', data);
 const fbPatch = (node, data) => fbWrite(node, 'PATCH', data);
 const fbDelete = (node) => fbWrite(node, 'DELETE');
 
-// ── 익명 인증 (쓰기 요청 토큰 확보) ────────────────────────────────────────
-async function initAnonymousAuth() {
-    try {
-        if (typeof firebase === 'undefined') return;
-        if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
-        window._fbAuth = firebase.auth();
-        if (!window._fbAuth.currentUser) {
-            await window._fbAuth.signInAnonymously();
-        }
-    } catch (e) {
-        console.warn('익명 인증 실패 — Firebase 콘솔에서 "익명" 로그인을 켜주세요:', e && (e.code || e.message));
-    }
+// ── Firebase Auth 초기화 (구글 로그인) ─────────────────────────────────────
+function initFirebaseAuth() {
+    if (typeof firebase === 'undefined') return;
+    if (!firebase.apps.length) firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+    window._fbAuth = firebase.auth();
+    // 리다이렉트 로그인 결과 (팝업이 막힌 환경)
+    window._fbAuth.getRedirectResult().catch(e => {
+        if (e && e.code && e.code !== 'auth/no-auth-event') showToast('로그인 실패: ' + e.message, 'error');
+    });
+    window._fbAuth.onAuthStateChanged(user => {
+        // 데이터 로드 전에는 보류, initBackend 끝에서 한 번 적용
+        if (!AppState.isSignedIn) { AppState.pendingAuthUser = user; return; }
+        applyAuthState(user);
+    });
 }
 
 // ── 초기화 ────────────────────────────────────────────────────────────────
@@ -294,13 +357,10 @@ async function initBackend() {
     }
 
     updateEditModeUI('loading');
-
-    // 익명 인증 먼저 (쓰기에 필요) — 실패해도 읽기는 진행
-    await initAnonymousAuth();
+    initFirebaseAuth();
 
     try {
         await loadAllData();
-        await loadEditPasscode();
     } catch (e) {
         updateEditModeUI('error');
         showToast('서버 연결 실패: ' + e.message, 'error');
@@ -308,17 +368,21 @@ async function initBackend() {
         return;
     }
 
-    // 이 기기에서 이전에 통과한 암호가 현재 암호와 같으면 편집 모드 자동 유지
-    const savedKey = localStorage.getItem(EDIT_KEY_STORAGE);
-    if (savedKey && AppState.editPasscodeHash && savedKey === AppState.editPasscodeHash) {
-        AppState.isEditor = true;
-        updateEditModeUI('unlocked');
-    } else {
-        if (savedKey) localStorage.removeItem(EDIT_KEY_STORAGE);
-        AppState.isEditor = false;
-        updateEditModeUI('locked');
-    }
-    updateEditButtonsVisibility();
+    // 로그인 상태 반영 (로드 중 도착한 상태 또는 현재 사용자)
+    const cur = (window._fbAuth && window._fbAuth.currentUser) || AppState.pendingAuthUser || null;
+    AppState.pendingAuthUser = undefined;
+    await applyAuthState(cur);
+    showKakaoNotice(false);
+}
+
+// 카카오톡 인앱 브라우저 안내 배너
+function showKakaoNotice(force) {
+    const el = document.getElementById('kakao-notice');
+    if (!el) return;
+    if (!isKakaoInAppBrowser() && !force) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = `📱 카카오톡 안에서는 구글 로그인이 막힐 수 있습니다. 보기만 할 때는 그대로 쓰고, 편집하려면
+      <a href="${kakaoExternalUrl()}">외부 브라우저(Chrome/Safari)로 열기</a> 를 눌러 주세요.`;
 }
 
 // ── 편집 버튼 표시 제어 ────────────────────────────────────────────────────
@@ -347,9 +411,9 @@ function updateEditButtonsVisibility() {
         } else {
             notice.style.display = 'block';
             notice.className = 'role-notice-banner';
-            notice.textContent = AppState.editPasscodeHash
-                ? '👀 읽기 전용 — 오른쪽 위 "편집 잠금 해제"에서 암호를 입력하면 편집할 수 있습니다.'
-                : '👀 읽기 전용 — 오른쪽 위 "편집 잠금 해제"에서 편집 암호를 먼저 설정하세요.';
+            notice.textContent = AppState.user
+                ? `👀 읽기 전용 — ${AppState.user.email} 계정은 아직 편집 권한이 없습니다. 오른쪽 위 "편집 권한 요청"을 눌러 주세요.`
+                : '👀 읽기 전용 — 오른쪽 위 "구글로 로그인"을 누르면 편집할 수 있습니다 (편집자로 등록된 계정만).';
         }
     }
 }

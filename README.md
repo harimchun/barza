@@ -1,6 +1,6 @@
 # ⚽ FC 바르자 팀 매니저 — 설정 가이드
 
-> 저장소: **Firebase Realtime Database** (팀 전체 공유, 로그인 불필요)
+> 저장소: **Firebase Realtime Database** (팀 전체 공유 · 보기는 로그인 불필요, 편집은 구글 로그인)
 
 ---
 
@@ -18,7 +18,7 @@
 3. 위치: 본인 가까운 곳 선택 (기본값 OK)
 4. 보안 규칙 → **"테스트 모드에서 시작"** 선택 → **"사용 설정"**
 
-### 3단계: 보안 규칙 수정 (읽기 공개 · 쓰기는 인증 필요)
+### 3단계: 보안 규칙 (읽기 공개 · 쓰기는 편집자 구글 계정만)
 
 Database 탭 → **"규칙"** 탭 → 아래 내용으로 교체 후 **"게시"**:
 
@@ -26,19 +26,31 @@ Database 탭 → **"규칙"** 탭 → 아래 내용으로 교체 후 **"게시"*
 {
   "rules": {
     ".read": true,
-    ".write": "auth != null"
+    ".write": "auth != null && auth.token.email != null && root.child('settings/editors').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+    "settings": {
+      "editors": {
+        "$key": {
+          ".write": "auth != null && auth.token.email != null && !root.child('settings/editors').exists() && $key == auth.token.email.toLowerCase().replace('.', ',')"
+        }
+      },
+      "editorRequests": {
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    }
   }
 }
 ```
 
-> 누구나 **볼** 수 있지만, **쓰기**는 인증된 요청만 허용합니다. 앱이 자동으로 **익명 로그인**하여
-> 쓰기 토큰을 얻으므로 팀원 개별 로그인은 필요 없습니다. (외부에서 주소만으로 데이터를 지우는 것을 막아줍니다.)
+> 누구나 **볼** 수 있지만, **쓰기**는 `/settings/editors` 에 등록된 구글 계정만 가능합니다.
+> 편집자 목록이 비어 있을 때는 처음 로그인한 계정이 스스로를 등록할 수 있고(부트스트랩),
+> 로그인한 누구나 자기 uid 로 권한 요청(`/settings/editorRequests`)을 남길 수 있습니다.
 
-### 3.5단계: 익명 로그인 켜기 (쓰기에 필요)
+### 3.5단계: Google 로그인 켜기
 
-**"빌드" → "Authentication" → "Sign-in method"** 탭 → **"익명(Anonymous)"** → **사용 설정** → 저장.
-
-> 이걸 켜지 않으면 저장 시 "DB 쓰기 실패"가 납니다. (보기는 됨)
+**"빌드" → "Authentication" → "Sign-in method"** 탭 → **Google** → **사용 설정** → 프로젝트 지원 이메일 선택 → 저장.
+같은 화면의 **설정 → 승인된 도메인**에 배포 도메인(예: `harimchun.github.io`)이 있어야 합니다.
 
 ### 4단계: DB URL 복사 → config.js 에 붙여넣기
 
@@ -62,7 +74,68 @@ FIREBASE_DB_URL: 'https://fc-barza-xxxxx-default-rtdb.firebaseio.com',
 python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import
 # 3) 앱에서 확인: python3 -m http.server 8765 → http://localhost:8765/index.html?local=1
 # 4) 문제 없으면 업로드 (기존 DB는 data/import/backup-*.json 으로 백업)
-python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import --upload --backup
+#    쓰기는 편집자 계정만 가능 → 앱에 로그인한 뒤 브라우저 콘솔에서
+#    await firebase.auth().currentUser.getIdToken()  값을 복사해 --id-token 으로 전달
+python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import --upload --backup --id-token <토큰>
+```
+
+> `scipy`, `numpy` 필요 (`pip install scipy numpy`). `report.md` 에 대시보드 대조 결과·별칭 해석·포메이션 추정 내역이 정리됩니다.
+
+## 쿼터 보장 계산 (js/quota.js)
+
+스프레드시트 수식을 그대로 옮긴 순수 함수 모듈입니다. 경기 정보에서 **쿼터 수(4/5)** 와 **쿼터당 출전 인원**을 고르면
+목표 쿼터 = 출전 인원 × 쿼터 수 ÷ 참석자 수 로 계산되고, 교체 In/Out 은 0.5쿼터로 차감됩니다.
+
+```bash
+node --test tests/*.test.js   # 시트의 실제 경기(2026.10.17)로 X열 값과 대조하는 테스트
+```
+
+## 앱 실행
+
+```bash
+python3 -m http.server 8080
+```
+→ 브라우저에서 `http://localhost:8080` 접속
+
+---
+
+## 팀과 공유하기
+
+### GitHub Pages (추천)
+
+1. 이 폴더를 GitHub 저장소에 업로드
+2. Settings → Pages → Source: `main` 브랜치
+3. 생성된 URL을 카카오톡 공유
+
+> ✅ **팀원 누구나 별도 로그인 없이** 같은 URL에서 같은 데이터를 바로 **볼** 수 있습니다.
+
+---
+
+## 편집 권한 (구글 로그인)
+
+기록을 **보는 것**은 누구나 가능하지만, **수정·저장**은 편집자로 등록된 구글 계정만 할 수 있습니다.
+
+1. 앱 우측 상단 **"G 구글로 로그인"** → 구글 계정 선택
+2. 편집자 목록이 비어 있으면 그 계정이 **첫 편집자**로 자동 등록됩니다
+3. 편집자는 **선수단 관리 → 편집 권한** 에서 멤버의 구글 이메일을 추가하거나, 멤버가 보낸 **권한 요청**을 승인합니다
+4. 권한이 없는 계정으로 로그인하면 우측 상단 **"편집 권한 요청"** 버튼으로 요청을 남길 수 있습니다
+
+> 📱 **카카오톡 안에서 열면** 구글 로그인 팝업이 막힐 수 있습니다. 앱이 안내 배너를 띄우니 "외부 브라우저로 열기"를 눌러 Chrome/Safari 에서 로그인하세요. 보기만 할 때는 카카오톡 안에서도 됩니다.
+
+## 데이터 구조 / 스프레드시트 이관
+
+- DB 구조(v2)는 [docs/data-schema.md](docs/data-schema.md) 참고. 경기는 `/matches/{날짜}`, 선수는 `/roster/{이름}` 단위로 저장됩니다.
+- 기존 팀 스프레드시트(경기 시트 + 대시보드)를 한 번에 가져오려면:
+
+```bash
+# 1) 구글 시트를 xlsx로 내려받기 (파일 > 다운로드 > Microsoft Excel)
+# 2) 결과 미리보기 (data/import/ 에 JSON + report.md 생성)
+python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import
+# 3) 앱에서 확인: python3 -m http.server 8765 → http://localhost:8765/index.html?local=1
+# 4) 문제 없으면 업로드 (기존 DB는 data/import/backup-*.json 으로 백업)
+#    쓰기는 편집자 계정만 가능 → 앱에 로그인한 뒤 브라우저 콘솔에서
+#    await firebase.auth().currentUser.getIdToken()  값을 복사해 --id-token 으로 전달
+python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import --upload --backup --id-token <토큰>
 ```
 
 > `scipy`, `numpy` 필요 (`pip install scipy numpy`). `report.md` 에 대시보드 대조 결과·별칭 해석·포메이션 추정 내역이 정리됩니다.
@@ -108,7 +181,6 @@ python3 -m http.server 8080
 
 > 🔑 암호 변경: **선수단 관리 → 편집 설정 → "편집 암호 변경"**. 변경하면 기존 암호로 해제했던 다른 기기는 다시 잠깁니다.
 >
-> ⚠️ 동작 방식: 앱이 자동으로 **익명 로그인**해서 DB 쓰기 토큰을 얻고(외부에서 주소만으로 무단 수정하는 것을 차단), 그 위에서 **공유 암호**가 "누가 편집 UI를 켜는지"를 제어합니다. 즉 암호는 팀원 간 *실수 방지*용 잠금입니다. 더 엄격히 막고 싶으면 팀원별 로그인(구글 등) + 이메일 기반 규칙으로 확장할 수 있습니다.
 
 ---
 
