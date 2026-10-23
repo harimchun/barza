@@ -2748,3 +2748,5 @@ body.sheet-open { overflow: hidden; }
 .pick-chip.from-sub { border-color: rgba(237, 187, 0, 0.45); }
 .participation-score.gk, .participation-diff.gk { color: #f87171; }
 .squad-row-gk .squad-name { color: #f87171; }
+#lock-quarter-btn.active { border-color: var(--gold); color: var(--gold); }
+.qs-lock { font-size: 0.68rem; color: var(--gold); margin-left: 0.4rem; }

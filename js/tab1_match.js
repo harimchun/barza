@@ -108,7 +108,9 @@ function renderFormationOverview() {
         const away = AppState.attendees.filter(x => !playerAvailable(x, q));
         const benchHtml = (bench.length ? `<div class="qs-bench">벤치 ${bench.map(escapeHtml).join(', ')}</div>` : '')
             + (away.length ? `<div class="qs-bench">불참 ${away.map(escapeHtml).join(', ')}</div>` : '');
-        const short = t && n < t.onFieldSize ? `<span class="qs-warn">${n}/${t.onFieldSize}</span>` : `<span class="qs-count">${n}명</span>`;
+        const lk = quarterLockState(q);
+        const lockBadge = lk.locked ? `<span class="qs-lock" title="잠근 자리">${lk.all ? '🔒 전체' : `🔒 ${lk.locked}`}</span>` : '';
+        const short = (t && n < t.onFieldSize ? `<span class="qs-warn">${n}/${t.onFieldSize}</span>` : `<span class="qs-count">${n}명</span>`) + lockBadge;
         return `
           <button type="button" class="qs-card ${q === AppState.currentQuarter ? 'active' : ''}" data-q="${q}">
             <div class="qs-head"><span class="qs-q">${q}</span><span class="qs-type">${escapeHtml(fType)}</span>${short}</div>
@@ -517,6 +519,7 @@ function renderFormationBuilder() {
     }
 
     const positionsHtml = getFormationPositions(q, fType).map(pos => buildPosCell(pos)).join('');
+    updateLockQuarterButton();
     container.innerHTML = `
     <div class="pitch-title">FC BARZA · ${escapeHtml(q)} · ${escapeHtml(fType)}</div>
     <div class="pitch-lines"></div>
@@ -605,6 +608,43 @@ function renderFormationBuilder() {
             cell.addEventListener('pointercancel', onUp);
         });
     });
+}
+
+// 현재 쿼터의 배치된 자리 전체 잠금/해제 버튼 상태
+function quarterLockState(q) {
+    const fMap = AppState.formationState[q] || {};
+    const locks = AppState.locks[q] || {};
+    const filled = Object.keys(fMap).filter(p => fMap[p] && fMap[p] !== '-');
+    const locked = filled.filter(p => locks[p]);
+    return { filled: filled.length, locked: locked.length, all: filled.length > 0 && locked.length === filled.length };
+}
+
+function updateLockQuarterButton() {
+    const btn = document.getElementById('lock-quarter-btn');
+    if (!btn) return;
+    const q = AppState.currentQuarter;
+    const st = quarterLockState(q);
+    btn.disabled = !AppState.isEditor || st.filled === 0;
+    btn.textContent = st.all ? `🔓 ${q} 전체 고정 해제` : `🔒 ${q} 전체 고정${st.locked ? ` (${st.locked}/${st.filled})` : ''}`;
+    btn.classList.toggle('active', st.all);
+}
+
+function toggleQuarterLock() {
+    if (!checkEditorAccess()) return;
+    const q = AppState.currentQuarter;
+    const st = quarterLockState(q);
+    if (st.filled === 0) { showToast('배치된 선수가 없습니다.', 'error'); return; }
+    const fMap = AppState.formationState[q];
+    if (!AppState.locks[q]) AppState.locks[q] = {};
+    if (st.all) {
+        AppState.locks[q] = {};
+        showToast(`${q} 전체 고정을 해제했습니다.`);
+    } else {
+        Object.keys(fMap).forEach(p => { if (fMap[p] && fMap[p] !== '-') AppState.locks[q][p] = true; });
+        showToast(`${q} 배치 ${st.filled}자리를 고정했습니다. 자동 초안이 이 쿼터는 유지합니다. 🔒`);
+    }
+    renderFormationBuilder();
+    renderFormationOverview();
 }
 
 // 대기 선수(벤치에서 누른 선수)를 자리에 배치 — 자리에 있던 선수는 벤치로
@@ -1159,6 +1199,8 @@ function initTab1Events() {
     document.getElementById('export-formation-btn').addEventListener('click', exportCombinedFormation);
     const draftBtn = document.getElementById('auto-draft-btn');
     if (draftBtn) draftBtn.addEventListener('click', runAutoDraft);
+    const lockBtn = document.getElementById('lock-quarter-btn');
+    if (lockBtn) lockBtn.addEventListener('click', toggleQuarterLock);
     document.getElementById('draft-save-btn').addEventListener('click', () => handleSave(true));
     document.getElementById('final-save-btn').addEventListener('click', () => handleSave(false));
     document.getElementById('new-match-btn').addEventListener('click', () => {
