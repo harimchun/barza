@@ -2,11 +2,12 @@
 // FC 바르자 팀 매니저 - Tab 3: 기록 조회 & 수정
 // =============================================
 
-function renderHistoryTab() {
+function renderHistoryTab(selectId) {
   const container = document.getElementById('tab3-content');
   if (!container) return;
 
   const history = [...AppState.matches].sort((a, b) => String(b.id).localeCompare(String(a.id)));
+  const startIdx = selectId ? Math.max(0, history.findIndex(m => m.id === selectId)) : 0;
 
   if (history.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>📭 저장된 경기 기록이 없습니다.</p></div>';
@@ -15,7 +16,7 @@ function renderHistoryTab() {
 
   const optionsHtml = history.map((m, i) => {
     const icon = m.status === 'draft' ? '📝' : (m.type === 'intra' ? '🔁' : '✅');
-    return `<option value="${i}">${icon} ${escapeHtml(m.date)} — ${escapeHtml(m.venue)} vs ${escapeHtml(m.opponent)}</option>`;
+    return `<option value="${i}" ${i === startIdx ? 'selected' : ''}>${icon} ${escapeHtml(m.date)} — ${escapeHtml(m.venue)} vs ${escapeHtml(m.opponent)}</option>`;
   }).join('');
 
   container.innerHTML = `
@@ -29,7 +30,8 @@ function renderHistoryTab() {
 
   const sel = document.getElementById('history-match-select');
   sel.addEventListener('change', () => renderMatchDetail(history[parseInt(sel.value)]));
-  renderMatchDetail(history[0]);
+  renderMatchDetail(history[startIdx]);
+  if (selectId) window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // events → 좌(바르자)/우(상대) 타임라인 HTML

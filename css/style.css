@@ -2665,3 +2665,58 @@ body.sheet-open { overflow: hidden; }
 }
 .attend-tools .guest-add-row #guest-pos-input { flex: 1 1 120px; }
 @media (max-width: 600px) { .attend-tools .guest-add-row { flex-wrap: wrap; } .attend-tools .guest-add-row input { flex: 1 1 45%; } }
+
+/* ── Phase 4: 시즌 스탯 보강 ── */
+.stats-filter { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.8rem; font-size: 0.85rem; }
+.stats-filter label { display: inline-flex; align-items: center; gap: 0.35rem; }
+.stats-filter select { padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+.stats-check input { accent-color: var(--burgundy); }
+.stats-summary-bar.compact { margin: 0.4rem 0 0.8rem; }
+.stats-summary-bar.compact .summary-num { font-size: 1.15rem; }
+.form-card { margin-bottom: 0.75rem; }
+.form-card h3 small { font-weight: 400; margin-left: 0.4rem; }
+.form-strip { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.form-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 0.05rem; min-width: 52px;
+  padding: 0.3rem 0.4rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: inherit; cursor: pointer; transition: var(--transition);
+}
+.form-chip:hover { border-color: var(--burgundy-light); }
+.form-res { font-weight: 800; font-size: 0.85rem; }
+.form-chip.win .form-res { color: var(--green-light); } .form-chip.loss .form-res { color: var(--red); } .form-chip.draw .form-res { color: var(--gold); }
+.form-score { font-size: 0.72rem; } .form-date { font-size: 0.62rem; color: var(--text-muted); }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.full-stats th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.full-stats th.sortable:hover { color: var(--gold); }
+.full-stats th.sortable.active { color: var(--gold); }
+.player-link { background: none; border: none; color: inherit; font: inherit; font-weight: inherit; cursor: pointer; padding: 0; text-decoration: underline dotted rgba(255,255,255,0.25); text-underline-offset: 3px; }
+.player-link:hover { color: var(--gold); }
+.num-cell.pos { color: var(--green-light); } .num-cell.neg { color: var(--red); }
+.pos-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.pos-chip { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.6rem; border-radius: 999px; border: 1px solid var(--border); font-size: 0.78rem; font-weight: 700; background: var(--surface); }
+.pos-chip em { font-style: normal; color: var(--text-muted); font-weight: 500; }
+.pos-chip i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--gold); }
+.q-bar { display: inline-block; width: 36px; height: 5px; background: rgba(255,255,255,0.08); border-radius: 3px; vertical-align: middle; margin-left: 0.3rem; overflow: hidden; }
+.q-bar i { display: block; height: 100%; background: var(--green-light); }
+.player-matches td, .player-matches th { font-size: 0.78rem; white-space: nowrap; }
+.player-matches .opp-cell { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.player-matches .pos-cell-text { font-size: 0.68rem; color: var(--text-muted); }
+.player-matches .res-win { color: var(--green-light); } .player-matches .res-loss { color: var(--red); } .player-matches .res-draw { color: var(--gold); }
+.player-matches small { color: var(--text-muted); font-size: 0.65rem; }
+@media (max-width: 600px) { .stats-summary-bar { flex-wrap: wrap; } .form-chip { min-width: 46px; } }
+.stats-filter label { white-space: nowrap; }
+
+/* 참석 도구: 검색은 한 줄, 용병 추가는 라벨 + 이름 + 포지션 + 버튼 한 줄 */
+.attend-tools { flex-direction: column; gap: 0.45rem; }
+.attend-tools #attend-filter { flex: none; width: 100%; }
+.attend-tools .guest-add-row { display: flex; align-items: center; gap: 0.35rem; flex: none; width: 100%; flex-wrap: nowrap; }
+.guest-add-label { font-size: 0.74rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+.attend-tools .guest-add-row #guest-name-input { flex: 2 1 90px; min-width: 70px; }
+.attend-tools .guest-add-row #guest-pos-input { flex: 3 1 110px; min-width: 90px; }
+.attend-tools .guest-add-row #add-guest-btn { flex: none; white-space: nowrap; }
+@media (max-width: 600px) {
+  .attend-tools .guest-add-row { flex-wrap: wrap; }
+  .guest-add-label { flex: 1 1 100%; }
+  .attend-tools .guest-add-row #guest-name-input { flex: 1 1 35%; }
+  .attend-tools .guest-add-row #guest-pos-input { flex: 1 1 40%; }
+}

@@ -182,11 +182,19 @@ function renderPlayerChecklist() {
     });
 
     const applyFilter = (kw) => {
+        let shown = 0;
         container.querySelectorAll('.player-check-item').forEach(el => {
             const n = el.querySelector('.player-cb').dataset.name;
-            el.style.display = (!kw || n.includes(kw)) ? '' : 'none';
+            const on = !kw || n.includes(kw);
+            el.style.display = on ? '' : 'none';
+            if (on) shown++;
         });
         container.querySelectorAll('details.check-group').forEach(d => { if (kw) d.open = true; });
+        let empty = container.querySelector('.filter-empty');
+        if (kw && shown === 0) {
+            if (!empty) { empty = document.createElement('p'); empty.className = 'empty-hint filter-empty'; container.prepend(empty); }
+            empty.textContent = `"${kw}" 이름이 명단에 없습니다. 새 용병이면 위의 "용병 추가" 줄에 입력하세요.`;
+        } else if (empty) empty.remove();
     };
     const filter = container.querySelector('#guest-filter');
     if (filter) filter.addEventListener('input', () => applyFilter(filter.value.trim()));
@@ -1011,11 +1019,11 @@ function initTab1Events() {
 
     // 게스트 추가
     document.getElementById('add-guest-btn').addEventListener('click', async () => {
-        if (!checkEditorAccess()) return;
+        if (!checkEditorAccess()) return; // 권한 없으면 이유를 토스트로 안내 (로그인 필요 / 권한 요청)
         const inp = document.getElementById('guest-name-input');
         const posInp = document.getElementById('guest-pos-input');
         const name = inp.value.trim().replace(/\s+/g, '');
-        if (!name) return;
+        if (!name) { showToast('용병 이름을 입력하세요.', 'error'); inp.focus(); return; }
         const positions = parsePositionsInput(posInp ? posInp.value : '');
         const existing = AppState.roster[name];
         if (!existing) {

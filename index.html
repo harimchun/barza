@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=20261024c">
+  <link rel="stylesheet" href="css/style.css?v=20261024f">
 
   <!-- Firebase SDK (익명 인증 — DB 쓰기 권한 확보용) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -119,11 +119,12 @@
           <section class="card step-card" id="step-attend">
             <div class="step-title"><span class="step-num">1</span>참석 체크 <span id="attend-summary-text" class="step-summary"></span></div>
             <div class="attend-tools">
-              <input type="search" id="attend-filter" placeholder="이름 검색" autocomplete="off">
+              <input type="search" id="attend-filter" placeholder="🔍 명단에서 이름 검색" autocomplete="off" aria-label="명단 검색">
               <div class="guest-add-row">
-                <input type="text" id="guest-name-input" class="editor-only" placeholder="용병 이름">
-                <input type="text" id="guest-pos-input" class="editor-only" placeholder="선호 포지션 (예: ST, LW)" title="우선순위 순으로 쉼표 구분">
-                <button id="add-guest-btn" class="btn-secondary editor-only">+ 용병</button>
+                <span class="guest-add-label">용병 추가</span>
+                <input type="text" id="guest-name-input" placeholder="이름" aria-label="용병 이름">
+                <input type="text" id="guest-pos-input" placeholder="포지션 (예: ST, LW)" title="우선순위 순으로 쉼표 구분" aria-label="용병 선호 포지션">
+                <button id="add-guest-btn" class="btn-secondary" type="button">+ 추가</button>
               </div>
             </div>
             <div id="player-checklist" class="player-checklist">
@@ -244,16 +245,16 @@
   <div id="toast-container"></div>
 
   <!-- ========== SCRIPTS ========== -->
-  <script src="js/config.js?v=20261024c"></script>
-  <script src="js/quota.js?v=20261024c"></script>
-  <script src="js/autodraft.js?v=20261024c"></script>
-  <script src="js/app.js?v=20261024c"></script>
-  <script src="js/drive.js?v=20261024c"></script>
-  <script src="js/formation.js?v=20261024c"></script>
-  <script src="js/tab1_match.js?v=20261024c"></script>
-  <script src="js/tab2_stats.js?v=20261024c"></script>
-  <script src="js/tab3_history.js?v=20261024c"></script>
-  <script src="js/tab4_roster.js?v=20261024c"></script>
+  <script src="js/config.js?v=20261024f"></script>
+  <script src="js/quota.js?v=20261024f"></script>
+  <script src="js/autodraft.js?v=20261024f"></script>
+  <script src="js/app.js?v=20261024f"></script>
+  <script src="js/drive.js?v=20261024f"></script>
+  <script src="js/formation.js?v=20261024f"></script>
+  <script src="js/tab1_match.js?v=20261024f"></script>
+  <script src="js/tab2_stats.js?v=20261024f"></script>
+  <script src="js/tab3_history.js?v=20261024f"></script>
+  <script src="js/tab4_roster.js?v=20261024f"></script>
 
 </body>
 
