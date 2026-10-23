@@ -363,6 +363,7 @@ function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+    if (tabId === 'tab1' && typeof syncPitchOrientation === 'function') syncPitchOrientation();
     if (tabId === 'tab2') renderStatsTab();
     if (tabId === 'tab3') renderHistoryTab();
     if (tabId === 'tab4') renderRosterTab();

@@ -499,7 +499,17 @@ function pitchLandscape() {
     const el = document.getElementById('formation-builder');
     const parent = el && el.parentElement;
     const w = parent ? (parent.clientWidth || parent.getBoundingClientRect().width) : 0;
-    return w >= 600; // 배치 카드 폭이 넉넉하면 가로 피치
+    if (w > 0) return w >= 600; // 배치 카드 폭이 넉넉하면 가로 피치
+    // 탭이 숨겨져 있어 폭을 잴 수 없으면 창 너비로 추정 (2열 레이아웃이면 오른쪽 열 ≈ 창 − 400px)
+    const vw = window.innerWidth || 0;
+    return (vw > 900 ? vw - 430 : vw - 40) >= 600;
+}
+
+// 탭 전환 등으로 보이게 된 뒤 가로/세로 모드가 어긋나 있으면 다시 그림
+function syncPitchOrientation() {
+    const el = document.getElementById('formation-builder');
+    if (!el || !el.querySelector('.pos-cell')) return;
+    if (el.classList.contains('landscape') !== pitchLandscape()) renderFormationBuilder();
 }
 function toScreenCoord(coord, landscape) {
     if (!landscape) return coord;
@@ -1562,6 +1572,7 @@ function loadMatchToEditor(record) {
     startAutoSave();
     setTimeout(() => {
         switchTab('tab1');
+        syncPitchOrientation();
         showToast(`"${record.title}" 불러오기 완료`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 0);
