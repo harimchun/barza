@@ -90,6 +90,9 @@ const AppState = {
     formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: inName } } — out 선수는 formationState[q][pos]
     formationCoords: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: {left,top}% } } 카드 자유 배치 오버라이드
     extraSubs: { '1Q': [], '2Q': [], '3Q': [], '4Q': [] },      // 포지션을 특정할 수 없는 교체 쌍 [{in,out}] (시트 이관분)
+    locks: {},          // { q: { pos: true } } 자동 초안이 건드리지 않는 자리
+    draftReasons: {},   // { q: { pos: { name, reason, rank, score } } } 자동 초안 배치 근거
+    draftSeed: 0,
     quarterScores: { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] },
     matchStats: {},  // { name: { goals: 0, assists: 0 } }
     matchEvents: [], // [{ quarter, type:'goal'|'opponentGoal', scorer, assister }]
@@ -175,6 +178,8 @@ function ensureQuarterState() {
         if (!AppState.formationCoords[q]) AppState.formationCoords[q] = {};
         if (!AppState.extraSubs[q]) AppState.extraSubs[q] = [];
         if (!AppState.quarterScores[q]) AppState.quarterScores[q] = [0, 0];
+        if (!AppState.locks[q]) AppState.locks[q] = {};
+        if (!AppState.draftReasons[q]) AppState.draftReasons[q] = {};
     });
     if (!editorQuarters().includes(AppState.currentQuarter)) AppState.currentQuarter = '1Q';
     if (!editorQuarters().includes(AppState.liveQuarter)) AppState.liveQuarter = '1Q';
@@ -259,6 +264,9 @@ function resetMatchState() {
     AppState.formationCoords = {};
     AppState.extraSubs = {};
     AppState.quarterScores = {};
+    AppState.locks = {};
+    AppState.draftReasons = {};
+    AppState.draftSeed = 0;
     AppState.matchStats = {};
     AppState.matchEvents = [];
     AppState.editingExtras = null;

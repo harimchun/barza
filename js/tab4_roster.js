@@ -77,17 +77,17 @@ function renderRosterTab() {
       </div>
     </div>
 
-    <div class="roster-grid">
+    <div class="roster-stack">
       <div class="roster-section">
         <h3>👕 정식 멤버 <span class="count-badge">${members.length}</span></h3>
         ${table(members, false)}
         ${inactive.length ? `<details style="margin-top:0.5rem"><summary class="hint-text">비활동 멤버 ${inactive.length}명</summary>${table(inactive, false)}</details>` : ''}
       </div>
-      <div class="roster-section">
-        <h3>🤝 용병 <span class="count-badge guest">${guests.length}</span> <small class="hint-text">최근 출전순</small></h3>
+      <details class="roster-section roster-guests" ${AppState.rosterGuestsOpen ? 'open' : ''}>
+        <summary><h3>🤝 용병 <span class="count-badge guest">${guests.length}</span> <small class="hint-text">최근 출전순 · 눌러서 펼치기</small></h3></summary>
         <input type="search" id="roster-guest-filter" placeholder="용병 이름 검색" autocomplete="off" style="margin-bottom:0.5rem">
         <div id="roster-guest-table">${table(guests, true)}</div>
-      </div>
+      </details>
     </div>
 
     <div class="roster-section" style="margin-top:1rem">
@@ -119,6 +119,8 @@ function renderRosterTab() {
   document.getElementById('new-player-name').addEventListener('keydown', e => {
     if (e.key === 'Enter') addPlayer();
   });
+  const guestsBox = container.querySelector('.roster-guests');
+  if (guestsBox) guestsBox.addEventListener('toggle', () => { AppState.rosterGuestsOpen = guestsBox.open; });
   const filter = document.getElementById('roster-guest-filter');
   if (filter) filter.addEventListener('input', () => {
     const kw = filter.value.trim();

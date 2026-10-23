@@ -435,17 +435,25 @@ function renderFormationBuilder() {
         return `<option value="-" ${current === '-' ? 'selected' : ''}>${noneLabel}</option>${optionHtml}`;
     }
 
+    const locks = AppState.locks[q] || {};
+    const reasons = AppState.draftReasons[q] || {};
     function buildPosCell(pos) {
         const label = (POSITION_DISPLAY_LABELS[fType] || {})[pos] || pos;
         const coord = getPosCoord(q, pos, fType);
         const rowKey = getPosRowKey(pos, fType);
         const hasSub = fSubs[pos] && fSubs[pos] !== '-';
         const filled = fMap[pos] && fMap[pos] !== '-';
+        const locked = !!locks[pos] && filled;
+        const r = reasons[pos];
+        const reasonHtml = (filled && r && r.name === fMap[pos] && !locked)
+            ? `<span class="pos-reason pos-reason-${escapeHtml(r.reason)}" title="자동 초안 근거: ${escapeHtml(AutoDraft.reasonLabel(r))}">${escapeHtml(AutoDraft.reasonLabel(r))}</span>` : '';
         return `
-      <div class="pos-cell ${filled ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
+      <div class="pos-cell ${filled ? 'is-filled' : ''} ${hasSub ? 'has-sub' : ''} ${locked ? 'is-locked' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
+        <button type="button" class="pos-lock-toggle ${locked ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="${locked ? '잠금 해제 (자동 초안이 바꿀 수 있음)' : '이 자리 잠그기 (자동 초안이 유지)'}" aria-label="자리 잠금">${locked ? '🔒' : '🔓'}</button>
         <button type="button" class="pos-sub-toggle ${hasSub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정/해제" aria-label="교체 선수 지정">⇄</button>
         <div class="pos-badge pos-badge-${rowKey}" title="드래그하여 위치 이동">${escapeHtml(label)}</div>
         <select class="pos-main-sel" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수">${buildOptions(pos, 'main')}</select>
+        ${reasonHtml}
         <select class="pos-sub-sel ${hasSub ? 'show' : ''}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 교체 선수">${buildOptions(pos, 'sub')}</select>
       </div>`;
     }
@@ -463,6 +471,17 @@ function renderFormationBuilder() {
     container.querySelectorAll('.pos-sub-sel').forEach(sel => {
         sel.addEventListener('change', () => fbApplySub(q, sel.dataset.pos, sel.value));
         sel.addEventListener('pointerdown', e => e.stopPropagation());
+    });
+
+    container.querySelectorAll('.pos-lock-toggle').forEach(btn => {
+        btn.addEventListener('pointerdown', e => e.stopPropagation());
+        btn.addEventListener('click', () => {
+            const pos = btn.dataset.pos;
+            if (!fMap[pos] || fMap[pos] === '-') { showToast('선수를 먼저 배치한 뒤 잠글 수 있습니다.', 'error'); return; }
+            if (!AppState.locks[q]) AppState.locks[q] = {};
+            if (AppState.locks[q][pos]) delete AppState.locks[q][pos]; else AppState.locks[q][pos] = true;
+            renderFormationBuilder();
+        });
     });
 
     container.querySelectorAll('.pos-sub-toggle').forEach(btn => {
@@ -538,6 +557,48 @@ function renderFormationBuilder() {
             cell.addEventListener('pointercancel', onUp);
         });
     });
+}
+
+// ── 자동 초안 (선호 포지션 + 쿼터 균형) ──────────────────────────────────
+function runAutoDraft() {
+    if (!checkEditorAccess()) return;
+    if (AppState.attendees.length === 0) { showToast('참석자를 먼저 선택하세요.', 'error'); return; }
+    const qs = editorQuarters();
+    const hasAny = qs.some(q => Object.keys(AppState.formationState[q] || {}).length > 0);
+    const lockCount = qs.reduce((n, q) => n + Object.keys(AppState.locks[q] || {}).filter(p => AppState.formationState[q] && AppState.formationState[q][p]).length, 0);
+    if (hasAny && AppState.draftSeed === 0) {
+        if (!confirm(`기존 배치를 자동 초안으로 덮어씁니다.${lockCount ? ` 잠근 ${lockCount}자리는 유지됩니다.` : ' (유지할 자리는 🔒 로 잠근 뒤 실행하세요)'} 계속할까요?`)) return;
+    }
+    const positions = {};
+    AppState.attendees.forEach(n => { positions[n] = (getPlayer(n) || {}).positions || []; });
+    const formationSlots = {};
+    Object.entries(FORMATION_POSITIONS).forEach(([f, def]) => { formationSlots[f] = def.rows.flatMap(r => r.positions); });
+    const locks = {};
+    qs.forEach(q => {
+        locks[q] = {};
+        Object.keys(AppState.locks[q] || {}).forEach(pos => {
+            const n = (AppState.formationState[q] || {})[pos];
+            if (n && n !== '-') locks[q][pos] = n;
+        });
+    });
+    AppState.draftSeed += 1;
+    const result = AutoDraft.generate({
+        attendees: AppState.attendees, positions,
+        quarterCount: AppState.quarterCount, onFieldSize: AppState.onFieldSize,
+        formations: AppState.formationTypes, formationSlots, locks,
+        seed: AppState.draftSeed * 7919 + AppState.attendees.length,
+    });
+    qs.forEach(q => {
+        AppState.formationState[q] = { ...result.quarters[q].lineup };
+        AppState.formationSubs[q] = {};
+        AppState.extraSubs[q] = [];
+        AppState.draftReasons[q] = result.quarters[q].reasons;
+    });
+    fbRefresh();
+    const t = editorTargets();
+    const msg = `✨ 초안 ${AppState.draftSeed}번째 · 목표 ${fmtQ(t.target)}Q · 실제 ${fmtQ(t.min)}~${fmtQ(t.max)}Q`;
+    showToast(msg, result.warnings.length ? 'error' : 'success');
+    result.warnings.forEach(w => showToast('⚠️ ' + w, 'error'));
 }
 
 // ── 이벤트 → 스코어/스탯 자동 계산 ─────────────────────────────────────────
@@ -913,6 +974,8 @@ function initTab1Events() {
         AppState.formationState[q] = {};
         AppState.formationSubs[q] = {};
         AppState.formationCoords[q] = {};
+        AppState.locks[q] = {};
+        AppState.draftReasons[q] = {};
         fbRefresh();
     });
 
@@ -926,6 +989,8 @@ function initTab1Events() {
     });
 
     document.getElementById('export-formation-btn').addEventListener('click', exportCombinedFormation);
+    const draftBtn = document.getElementById('auto-draft-btn');
+    if (draftBtn) draftBtn.addEventListener('click', runAutoDraft);
     document.getElementById('draft-save-btn').addEventListener('click', () => handleSave(true));
     document.getElementById('final-save-btn').addEventListener('click', () => handleSave(false));
     document.getElementById('new-match-btn').addEventListener('click', () => {
@@ -1095,6 +1160,7 @@ function loadMatchToEditor(record) {
     };
     AppState.formationTypes = {}; AppState.formationState = {}; AppState.formationCoords = {};
     AppState.formationSubs = {}; AppState.extraSubs = {}; AppState.quarterScores = {};
+    AppState.locks = {}; AppState.draftReasons = {}; AppState.draftSeed = 0;
 
     editorQuarters().forEach(q => {
         const qd = (record.quarters || {})[q] || {};
