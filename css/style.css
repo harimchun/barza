@@ -31,7 +31,7 @@
   --green-light: #5cd38c;
   --gold: #f5c542;
   --gold-dim: rgba(245, 197, 66, 0.16);
-  --gradient-club: linear-gradient(120deg, #6a0f3b 0%, #b91457 45%, #17407e 100%);
+  --gradient-club: #4a0f2c; /* 단색 (그라데이션 미사용) */
 }
 
 /* --- 리셋 & 기본 --- */
@@ -50,12 +50,6 @@ html {
 body {
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   background: var(--bg);
-  /* 좌상단 가넷 + 우상단 클럽블루 글로우 — 블라우그라나 앰비언스 */
-  background-image:
-    radial-gradient(900px 340px at 18% -100px, rgba(165, 0, 68, 0.16), transparent 70%),
-    radial-gradient(900px 340px at 85% -120px, rgba(0, 77, 152, 0.18), transparent 70%);
-  background-attachment: fixed;
-  background-repeat: no-repeat;
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -64,7 +58,7 @@ body {
 
 /* --- 헤더 (블라우그라나 그라디언트 바) --- */
 .app-header {
-  background: linear-gradient(120deg, #10040c 0%, #43001f 38%, #0b1f3c 100%);
+  background: #3a0b22;
   border-bottom: 2px solid rgba(237, 187, 0, 0.35);
   padding: 0 1.5rem;
   height: 60px;
@@ -1209,7 +1203,7 @@ input[type="checkbox"] {
   padding: 0.4rem 0.8rem;
   font-size: 0.88rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #16a34a, #22c55e);
+  background: #22c55e;
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
@@ -1723,7 +1717,7 @@ input[type="checkbox"] {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, rgba(237, 187, 0, 0.85), transparent);
+  background: rgba(245, 197, 66, 0.85);
 }
 
 .hero-top {
@@ -1988,7 +1982,7 @@ input[type="checkbox"] {
   left: 50%;
   width: 2px;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .tl-row {
@@ -2772,25 +2766,19 @@ body.sheet-open { overflow: hidden; }
 /* ═══════════════════════════════════════════════════════════
    디자인 리프레시: 밝은 배경 · 아이콘 · 피치 가로 모드
    ═══════════════════════════════════════════════════════════ */
-body {
-  background:
-    radial-gradient(1100px 520px at 12% -12%, rgba(185, 20, 87, 0.22), transparent 60%),
-    radial-gradient(900px 480px at 100% -5%, rgba(30, 91, 184, 0.22), transparent 60%),
-    var(--bg);
-  color: var(--text);
-}
-.app-header { background: linear-gradient(120deg, #2a0a1c 0%, #5c0d33 40%, #10274f 100%); border-bottom: 1px solid rgba(245, 197, 66, 0.4); box-shadow: 0 4px 18px rgba(0,0,0,0.25); }
+body { background: var(--bg); color: var(--text); }
+.app-header { background: #3a0b22; border-bottom: 1px solid rgba(245, 197, 66, 0.4); box-shadow: 0 4px 18px rgba(0,0,0,0.25); }
 .header-logo .badge { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(255,255,255,0.1); color: var(--gold); }
 .header-logo .name small { font-size: 0.72rem; font-weight: 500; color: rgba(255,255,255,0.72); margin-left: 0.3rem; }
 .tab-nav { gap: 0.25rem; border-bottom: 1px solid var(--border); margin-bottom: 1.1rem; }
 .tab-btn { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 9px 9px 0 0; }
 .tab-btn .ic { width: 1.05em; height: 1.05em; opacity: 0.85; }
-.tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); background: linear-gradient(180deg, rgba(245,197,66,0.08), transparent); }
-.card, #tab1 .card { background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 40%), var(--surface); border: 1px solid var(--border); box-shadow: none; }
+.tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); background: transparent; }
+.card, #tab1 .card { background: var(--surface); border: 1px solid var(--border); box-shadow: none; }
 .card-title, .step-title { letter-spacing: -0.01em; }
 input, select, textarea { background: var(--surface-2); border-color: var(--border-strong); color: var(--text); }
 input:focus, select:focus, textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); outline: none; }
-.btn-primary { background: linear-gradient(135deg, #d8175c, #a50044); border: none; box-shadow: 0 4px 14px rgba(192, 20, 79, 0.35); }
+.btn-primary { background: var(--burgundy); border: none; box-shadow: none; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-secondary { background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text); }
 .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
@@ -2818,7 +2806,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--gold); box-shado
 .summary-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .summary-num { color: var(--gold); }
 .status-badge, .hero-result-chip { display: inline-flex; align-items: center; gap: 0.3rem; }
-.match-hero { background: var(--gradient-club); border: 1px solid rgba(245,197,66,0.3); }
+.match-hero { background: #3a0b22; border: 1px solid rgba(245,197,66,0.3); }
 .empty-state .ic { width: 2rem; height: 2rem; color: var(--text-muted); margin-bottom: 0.4rem; }
 .toast { background: var(--surface-2); border: 1px solid var(--border-strong); color: var(--text); }
 .toast-error { border-color: var(--red); }
