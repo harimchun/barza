@@ -258,7 +258,7 @@ function renderSquadTable() {
     }
     const t = editorTargets();
     const qs = t.quarterKeys;
-    const statusLabel = { under: '부족', over: '초과', ok: '' };
+    const statusLabel = { under: '부족', over: '초과', ok: '', gk: 'GK' };
     const rows = [...AppState.attendees]
         .sort((a, b) => (t.participation[b] ? t.participation[b].credit : 0) - (t.participation[a] ? t.participation[a].credit : 0) || a.localeCompare(b, 'ko'))
         .map(name => {
@@ -273,7 +273,7 @@ function renderSquadTable() {
             const diff = p.credit - myTarget;
             const st = p.credit === 0 ? 'unplayed' : t.status[name];
             const partial = Math.abs(myTarget - t.target) > 1e-9 ? ` <small class="my-target">목표 ${fmtQ(myTarget)}</small>` : '';
-            const diffStr = p.credit === 0 ? '미출전' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}${partial}`;
+            const diffStr = p.credit === 0 ? '미출전' : (st === 'gk' ? '전담' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}${partial}`);
             return `<tr class="squad-row-${st}">
       <td class="squad-name">${escapeHtml(formatPlayerName(name))}</td>
       ${qCells}

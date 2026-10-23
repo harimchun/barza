@@ -361,12 +361,19 @@
 
         const slotsTotal = onFieldSize * quarterCount;
         const target = attendees.length ? slotsTotal / attendees.length : 0;
-        const vals = Object.values(credits);
+        // 전담 GK(뛴 쿼터가 전부 GK 자리)는 보통 전 쿼터를 뛰므로 차이 경고에서 제외
+        const gkOnly = n => {
+            let played = 0, gk = 0;
+            quarters.forEach(q => { const l = result.quarters[q].lineup; if (Object.values(l).includes(n)) { played++; if (l.GK === n) gk++; } });
+            return played > 0 && played === gk;
+        };
+        const rangeNames = attendees.filter(n => !gkOnly(n));
+        const vals = rangeNames.map(n => credits[n]);
         const maxC = vals.length ? Math.max(...vals) : 0, minC = vals.length ? Math.min(...vals) : 0;
         const spread = maxC - minC;
         if (spread >= 2) {
-            const most = attendees.filter(n => credits[n] === maxC).join(', ');
-            const least = attendees.filter(n => credits[n] === minC).join(', ');
+            const most = rangeNames.filter(n => credits[n] === maxC).join(', ');
+            const least = rangeNames.filter(n => credits[n] === minC).join(', ');
             warnings.push(`출전 쿼터 차이 ${spread}Q — 최다 ${maxC}Q: ${most} / 최소 ${minC}Q: ${least} (GK 전담·잠금·출전 불가 때문일 수 있음)`);
         }
         return { quarters: result.quarters, bench: result.bench, credits, target, subCount, warnings };

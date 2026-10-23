@@ -69,10 +69,11 @@
             const qd = (quarters && quarters[q]) || {};
             quarterNames(qd).forEach(name => {
                 const c = quarterCredit(qd.lineup, qd.subs, name);
-                const r = result[name] || (result[name] = { credit: 0, played: 0, subCount: 0, byQuarter: {} });
+                const r = result[name] || (result[name] = { credit: 0, played: 0, subCount: 0, gkQuarters: 0, byQuarter: {} });
                 r.credit += c;
                 r.byQuarter[q] = c;
                 if (c > 0) r.played += 1;
+                if ((qd.lineup || {}).GK === name) r.gkQuarters += 1;
                 r.subCount += subAppearances(qd.subs, name);
             });
         });
@@ -87,8 +88,10 @@
      * @returns {Object} {
      *   quarterKeys, attendees, slots, target, personalTarget:{name:t}, availableCount:{name:n},
      *   perQuarter:{q:n}, actualSlots, participation, avg, min, max, spread,
-     *   under:[], over:[], unplayed:[], balanced
+     *   under:[], over:[], unplayed:[], gkExempt:[], balanced
      * }
+     *   전담 GK(뛴 쿼터가 모두 GK 자리이고 가능한 쿼터를 전부 뛴 선수)는 status 'gk' 로 두고
+     *   초과/범위/균형 판정에서 제외한다 (GK 는 보통 전 쿼터를 뛰므로 경고 대상이 아님).
      */
     function computeTargets(opts) {
         const quarters = (opts && opts.quarters) || {};
@@ -117,16 +120,23 @@
         const availSum = attendees.reduce((s, n) => s + availableCount[n], 0);
         const personalTarget = {};
         attendees.forEach(n => { personalTarget[n] = availSum ? slots * availableCount[n] / availSum : 0; });
+        const isFullTimeGK = n => {
+            const p = participation[n];
+            return !!p && p.played > 0 && p.gkQuarters === p.played && p.played >= availableCount[n];
+        };
+        const gkExempt = attendees.filter(isFullTimeGK);
         const credits = attendees.map(n => (participation[n] ? participation[n].credit : 0));
         const played = credits.filter(c => c > 0);
         const avg = played.length ? played.reduce((a, b) => a + b, 0) / played.length : 0;
-        const min = credits.length ? Math.min(...credits) : 0;
-        const max = credits.length ? Math.max(...credits) : 0;
+        const rangeCredits = attendees.filter(n => !isFullTimeGK(n)).map(n => (participation[n] ? participation[n].credit : 0));
+        const min = rangeCredits.length ? Math.min(...rangeCredits) : 0;
+        const max = rangeCredits.length ? Math.max(...rangeCredits) : 0;
 
         const status = {};
         const under = [], over = [], unplayed = [];
         attendees.forEach(n => {
             const c = participation[n] ? participation[n].credit : 0;
+            if (isFullTimeGK(n)) { status[n] = 'gk'; return; }
             const s = participationStatus(c, personalTarget[n]);
             status[n] = s;
             if (c === 0) unplayed.push(n);
@@ -138,7 +148,7 @@
             quarterKeys: keys, quarterCount, onFieldSize,
             attendees: attendees.length, slots, actualSlots, target, personalTarget, availableCount, perQuarter,
             participation, status, avg, min, max, spread: max - min,
-            under, over, unplayed,
+            under, over, unplayed, gkExempt,
             balanced: (max - min) < 2,
         };
     }

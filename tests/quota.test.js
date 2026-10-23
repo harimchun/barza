@@ -121,3 +121,30 @@ test('computeTargets: 일부 쿼터만 참석하는 선수는 개인 목표가 �
     const t2 = Quota.computeTargets({ quarters: {}, attendees, quarterCount: 4, onFieldSize: 11 });
     assert.ok(Object.values(t2.personalTarget).every(v => Math.abs(v - 44 / 12) < 1e-9));
 });
+
+test('computeTargets: 전 쿼터 GK로 뛴 전담 GK는 초과·범위·균형 판정에서 제외', () => {
+    const quarters = {};
+    ['1Q', '2Q', '3Q', '4Q'].forEach((q, i) => {
+        quarters[q] = { lineup: { GK: '키퍼', ST: i % 2 ? 'A' : 'B', CAM: 'C' }, subs: [] };
+    });
+    const t = Quota.computeTargets({ quarters, attendees: ['키퍼', 'A', 'B', 'C'], quarterCount: 4, onFieldSize: 3 });
+    assert.equal(t.status['키퍼'], 'gk');
+    assert.deepEqual(t.gkExempt, ['키퍼']);
+    assert.ok(!t.over.includes('키퍼'));        // 키퍼 4쿼터지만 초과 아님
+    assert.equal(t.max, 4);                     // C 가 4쿼터 (CAM)
+    assert.equal(t.status['C'], 'over');
+    // 키퍼를 빼고 보면 A/B 2, C 4 → 차이 2 → 불균형 (GK 때문은 아님)
+    assert.equal(t.balanced, false);
+    const t2 = Quota.computeTargets({ quarters: {
+        '1Q': { lineup: { GK: '키퍼', ST: 'A' } }, '2Q': { lineup: { GK: '키퍼', ST: 'B' } },
+        '3Q': { lineup: { GK: '키퍼', ST: 'A' } }, '4Q': { lineup: { GK: '키퍼', ST: 'B' } } },
+        attendees: ['키퍼', 'A', 'B'], quarterCount: 4, onFieldSize: 2 });
+    assert.equal(t2.balanced, true);            // 키퍼 4 vs A/B 2 지만 전담 GK 제외 → 균형
+    assert.equal(t2.min, 2); assert.equal(t2.max, 2);
+    // GK 로도 뛰고 필드로도 뛰면 전담이 아님
+    const t3 = Quota.computeTargets({ quarters: {
+        '1Q': { lineup: { GK: '키퍼', ST: 'A' } }, '2Q': { lineup: { GK: 'A', ST: '키퍼' } },
+        '3Q': { lineup: { GK: '키퍼', ST: 'A' } }, '4Q': { lineup: { GK: '키퍼', ST: 'A' } } },
+        attendees: ['키퍼', 'A', 'B'], quarterCount: 4, onFieldSize: 2 });
+    assert.notEqual(t3.status['키퍼'], 'gk');
+});
