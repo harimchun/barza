@@ -129,7 +129,7 @@ function renderStatsTab() {
     if (matches.length === 0) {
         container.innerHTML = filterBar + `
       <div class="empty-state">
-        <p>📭 조건에 맞는 경기 기록이 없습니다.</p>
+        <p>${icon('inbox')} 조건에 맞는 경기 기록이 없습니다.</p>
         <p>경기를 "확정 저장"하면 여기에 통계가 집계됩니다.</p>
       </div>`;
         bindStatsFilter();
@@ -181,31 +181,31 @@ function renderStatsTab() {
     </div>
 
     <div class="leaderboard-card form-card">
-      <h3>📅 최근 전적 <small class="hint-text">누르면 기록으로 이동</small></h3>
+      <h3>${icon('calendar')} 최근 전적 <small class="hint-text">누르면 기록으로 이동</small></h3>
       <div class="form-strip">${form}</div>
     </div>
 
     <div class="leaderboard-grid">
       <div class="leaderboard-card">
-        <h3>⚽ 득점 Top 10</h3>
+        <h3>${icon('ball')} 득점 Top 10</h3>
         ${buildLeaderboardTable(by('goals'), [{ key: 'goals', label: '골' }, { key: 'matches', label: '출전' }])}
       </div>
       <div class="leaderboard-card">
-        <h3>👟 도움 Top 10</h3>
+        <h3>${icon('assist')} 도움 Top 10</h3>
         ${buildLeaderboardTable(by('assists'), [{ key: 'assists', label: '도움' }, { key: 'matches', label: '출전' }])}
       </div>
       <div class="leaderboard-card">
-        <h3>🔥 공격포인트 Top 10</h3>
+        <h3>${icon('star')} 공격포인트 Top 10</h3>
         ${buildLeaderboardTable(by('attackPoints'), [{ key: 'attackPoints', label: '공격P' }, { key: 'goals', label: '골' }, { key: 'assists', label: '도움' }])}
       </div>
       <div class="leaderboard-card">
-        <h3>🏃 출전 Top 10</h3>
+        <h3>${icon('clock')} 출전 Top 10</h3>
         ${buildLeaderboardTable(by('quarters'), [{ key: 'matches', label: '출전' }, { key: 'quarters', label: '총 쿼터', fmt: fmtQ }, { key: 'avgQ', label: '평균', fmt: fmtQ }])}
       </div>
     </div>
 
     <div class="leaderboard-card" style="margin-top:0.75rem">
-      <h3>🏟️ 쿼터별 득·실점</h3>
+      <h3>${icon('pitch')} 쿼터별 득·실점</h3>
       <table class="leaderboard-table">
         <thead><tr><th>쿼터</th><th>득점</th><th>실점</th><th>득실</th></tr></thead>
         <tbody>${quarterKeys.map(q => { const [a, b] = s.byQuarter[q]; return `<tr><td class="name-cell">${q}</td><td class="num-cell">${a}</td><td class="num-cell">${b}</td><td class="num-cell ${a - b > 0 ? 'pos' : a - b < 0 ? 'neg' : ''}">${a - b > 0 ? '+' : ''}${a - b}</td></tr>`; }).join('')}</tbody>
@@ -213,7 +213,7 @@ function renderStatsTab() {
     </div>
 
     <div class="leaderboard-card" style="margin-top:0.75rem">
-      <h3>👥 전체 선수 기록 <small class="hint-text">열 제목을 눌러 정렬 · 이름을 누르면 상세</small>
+      <h3>${icon('users')} 전체 선수 기록 <small class="hint-text">열 제목을 눌러 정렬 · 이름을 누르면 상세</small>
         <label class="stats-check table-toggle"><input type="checkbox" id="stats-full-guests" ${includeGuests ? 'checked' : ''}> 용병 포함 <small>(${players.filter(p => isGuest(p.name)).length}명)</small></label></h3>
       <div class="table-scroll">
         <table class="leaderboard-table full-stats">
@@ -224,7 +224,7 @@ function renderStatsTab() {
     </div>
 
     <div class="export-row">
-      <button class="btn-secondary" id="stats-export-btn">📥 CSV 다운로드 (현재 필터)</button>
+      <button class="btn-secondary" id="stats-export-btn">${icon('download')} CSV 다운로드 (현재 필터)</button>
     </div>`;
 
     bindStatsFilter();
@@ -288,7 +288,7 @@ function openPlayerDetail(name, season) {
           <td><button type="button" class="player-link" data-match="${escapeHtml(m.id)}">${escapeHtml(String(m.date).slice(2))}</button></td>
           <td class="opp-cell">${escapeHtml(m.opponent || '')}${m.type === 'intra' ? ' <small>자체</small>' : ''}</td>
           <td class="num-cell res-${resCls}">${res} <small>${m.result.u}:${m.result.t}</small></td>
-          <td class="num-cell">${fmtQ(m.credit)}${m.subCount ? '<small>⇄</small>' : ''} ${qBar}</td>
+          <td class="num-cell">${fmtQ(m.credit)}${m.subCount ? `<small>${icon('swap', 'ic-sm')}</small>` : ''} ${qBar}</td>
           <td class="num-cell">${m.goals || ''}</td>
           <td class="num-cell">${m.assists || ''}</td>
           <td class="pos-cell-text">${m.positions.map(escapeHtml).join(' ') || '-'}</td>
@@ -298,7 +298,7 @@ function openPlayerDetail(name, season) {
     body.innerHTML = `
       <div class="pick-head">
         <span class="pick-title">${escapeHtml(formatPlayerName(name))}${player.fullName && player.fullName !== name ? ` <small>${escapeHtml(player.fullName)}</small>` : ''}${player.jerseyNo != null ? ` <small>#${player.jerseyNo}</small>` : ''}</span>
-        <button type="button" class="pick-close" data-close="1" aria-label="닫기">✕</button>
+        <button type="button" class="pick-close" data-close="1" aria-label="닫기">${icon('close')}</button>
       </div>
       <div class="hint-text" style="margin-bottom:0.5rem">선호 포지션: ${(player.positions || []).join(', ') || '-'}</div>
       <div class="stats-summary-bar compact">

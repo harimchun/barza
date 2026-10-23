@@ -76,34 +76,34 @@ function updateEditModeUI(state) {
 
     switch (state) {
         case 'no-config':
-            btn.textContent = '⚙️ DB 미설정';
+            btn.innerHTML = `${icon('settings')} DB 미설정`;
             btn.classList.add('auth-warn');
             btn.onclick = () => window.open('https://console.firebase.google.com/', '_blank');
             status.textContent = 'js/config.js에서 FIREBASE_DB_URL을 설정하세요.';
             break;
 
         case 'loading':
-            btn.textContent = '⏳ 로딩 중';
+            btn.innerHTML = `${icon('clock')} 로딩 중`;
             btn.disabled = true;
             status.textContent = '데이터를 불러오는 중...';
             break;
 
         case 'error':
-            btn.textContent = '❌ 연결 오류';
+            btn.innerHTML = `${icon('alert')} 연결 오류`;
             btn.classList.add('auth-warn');
             btn.onclick = () => initBackend();
             status.textContent = 'DB 연결 실패. 새로고침하거나 설정을 확인하세요.';
             break;
 
         case 'signed-out':
-            btn.textContent = 'G 구글로 로그인';
+            btn.innerHTML = `${icon('google', 'ic-fill')} 구글로 로그인`;
             btn.onclick = signInWithGoogle;
             status.textContent = '읽기 전용';
             break;
 
         case 'no-access':
             { const mu = document.getElementById('auth-menu-user'); if (mu && u) mu.textContent = `${u.email} · 권한 없음`; }
-            btn.textContent = '🙋 편집 권한 요청';
+            btn.innerHTML = `${icon('hand')} 편집 권한 요청`;
             btn.classList.add('auth-warn');
             btn.onclick = requestEditorAccess;
             status.textContent = `${u ? u.email : ''} · 편집 권한 없음`;
@@ -112,14 +112,14 @@ function updateEditModeUI(state) {
 
         case 'requested':
             { const mu = document.getElementById('auth-menu-user'); if (mu && u) mu.textContent = `${u.email} · 승인 대기`; }
-            btn.textContent = '⏳ 승인 대기 중';
+            btn.innerHTML = `${icon('clock')} 승인 대기 중`;
             btn.disabled = true;
             status.textContent = `${u ? u.email : ''} · 편집자 승인을 기다리는 중`;
             if (menu) menu.style.display = '';
             break;
 
         case 'unlocked':
-            btn.textContent = `✏️ ${u && (u.displayName || u.email)}`;
+            btn.innerHTML = `${icon('edit')} ${escapeHtml(u && (u.displayName || u.email))}`;
             { const mu = document.getElementById('auth-menu-user'); if (mu && u) mu.textContent = `${u.email} · 편집 가능`; }
             btn.classList.add('auth-connected');
             btn.onclick = () => { if (menu) menu.style.display = menu.style.display === 'none' ? '' : 'none'; };
@@ -235,7 +235,7 @@ async function applyAuthState(user) {
     if (Object.keys(AppState.editors).length === 0 && AppState.user.email) {
         try {
             await addEditor(AppState.user.email, AppState.user.displayName, 'bootstrap');
-            showToast('첫 편집자로 등록되었습니다. 선수단 관리 → 편집 설정에서 다른 멤버를 추가하세요. 🎉');
+            showToast('첫 편집자로 등록되었습니다. 선수단 관리 → 편집 권한에서 다른 멤버를 추가하세요.');
         } catch (e) {
             console.warn('첫 편집자 등록 실패:', e);
         }
@@ -255,8 +255,8 @@ async function applyAuthState(user) {
 function checkEditorAccess() {
     if (AppState.isEditor) return true;
     showToast(AppState.user
-        ? '🔒 편집 권한이 없습니다. 오른쪽 위 "편집 권한 요청"을 눌러 주세요.'
-        : '🔒 편집하려면 오른쪽 위에서 구글로 로그인하세요.', 'error');
+        ? '편집 권한이 없습니다. 오른쪽 위 "편집 권한 요청"을 눌러 주세요.'
+        : '편집하려면 오른쪽 위에서 구글로 로그인하세요.', 'error');
     return false;
 }
 
@@ -381,7 +381,7 @@ function showKakaoNotice(force) {
     if (!el) return;
     if (!isKakaoInAppBrowser() && !force) { el.style.display = 'none'; return; }
     el.style.display = 'block';
-    el.innerHTML = `📱 카카오톡 안에서는 구글 로그인이 막힐 수 있습니다. 보기만 할 때는 그대로 쓰고, 편집하려면
+    el.innerHTML = `${icon('phone')} 카카오톡 안에서는 구글 로그인이 막힐 수 있습니다. 보기만 할 때는 그대로 쓰고, 편집하려면
       <a href="${kakaoExternalUrl()}">외부 브라우저(Chrome/Safari)로 열기</a> 를 눌러 주세요.`;
 }
 
@@ -411,9 +411,9 @@ function updateEditButtonsVisibility() {
         } else {
             notice.style.display = 'block';
             notice.className = 'role-notice-banner';
-            notice.textContent = AppState.user
-                ? `👀 읽기 전용 — ${AppState.user.email} 계정은 아직 편집 권한이 없습니다. 오른쪽 위 "편집 권한 요청"을 눌러 주세요.`
-                : '👀 읽기 전용 — 오른쪽 위 "구글로 로그인"을 누르면 편집할 수 있습니다 (편집자로 등록된 계정만).';
+            notice.innerHTML = icon('eye') + (AppState.user
+                ? ` 읽기 전용 — ${escapeHtml(AppState.user.email)} 계정은 아직 편집 권한이 없습니다. 오른쪽 위 "편집 권한 요청"을 눌러 주세요.`
+                : ' 읽기 전용 — 오른쪽 위 "구글로 로그인"을 누르면 편집할 수 있습니다 (편집자로 등록된 계정만).');
         }
     }
 }

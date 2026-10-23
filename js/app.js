@@ -121,6 +121,11 @@ function today() {
     return local.toISOString().slice(0, 10);
 }
 
+// 인라인 SVG 아이콘 (index.html 스프라이트 참조)
+function icon(name, cls) {
+    return `<svg class="ic${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${name}"></use></svg>`;
+}
+
 // HTML 삽입 시 사용자 입력(이름/장소/상대팀 등)을 안전하게 이스케이프
 function escapeHtml(value) {
     return String(value == null ? '' : value)

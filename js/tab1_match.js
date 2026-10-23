@@ -51,7 +51,7 @@ function undoEdit() {
     AppState.redoStack.push(editorSnapshot());
     applySnapshot(AppState.undoStack.pop());
     updateUndoButtons();
-    showToast('↶ 실행 취소');
+    showToast('실행 취소');
 }
 
 function redoEdit() {
@@ -59,7 +59,7 @@ function redoEdit() {
     AppState.undoStack.push(editorSnapshot());
     applySnapshot(AppState.redoStack.pop());
     updateUndoButtons();
-    showToast('↷ 다시 실행');
+    showToast('다시 실행');
 }
 
 function clearUndo() {
@@ -136,7 +136,7 @@ function updateEditModeNotice() {
     if (AppState.editModeId) {
         const extra = AppState.editingExtras || {};
         const tag = extra.source && extra.source.kind === 'sheet' ? ' (스프레드시트 이관 기록)' : '';
-        el.textContent = `✏️ 수정 중: ${AppState.editModeId}${tag}`;
+        el.innerHTML = `${icon('edit')} 수정 중: ${escapeHtml(AppState.editModeId)}${escapeHtml(tag)}`;
         el.style.display = 'block';
     } else {
         el.style.display = 'none';
@@ -159,13 +159,13 @@ function renderFormationOverview() {
             if (!names.length) return '';
             return `<div class="qs-line"><span class="qs-line-key qs-${row.key}">${row.key.toUpperCase()}</span>${names.map(escapeHtml).join(' · ')}</div>`;
         }).reverse().join('') : '';
-        const subHtml = subs.length ? `<div class="qs-subs">⇄ ${subs.map(sb => `${escapeHtml(sb.in || '?')}→${escapeHtml(sb.out || '?')}`).join(', ')}</div>` : '';
+        const subHtml = subs.length ? `<div class="qs-subs">${icon('swap', 'ic-sm')} ${subs.map(sb => `${escapeHtml(sb.in || '?')}→${escapeHtml(sb.out || '?')}`).join(', ')}</div>` : '';
         const bench = AppState.attendees.filter(x => !Object.values(lineup).includes(x) && !subs.some(sb => sb.in === x) && playerAvailable(x, q));
         const away = AppState.attendees.filter(x => !playerAvailable(x, q));
         const benchHtml = (bench.length ? `<div class="qs-bench">벤치 ${bench.map(escapeHtml).join(', ')}</div>` : '')
             + (away.length ? `<div class="qs-bench">불참 ${away.map(escapeHtml).join(', ')}</div>` : '');
         const lk = quarterLockState(q);
-        const lockBadge = lk.locked ? `<span class="qs-lock" title="잠근 자리">${lk.all ? '🔒 전체' : `🔒 ${lk.locked}`}</span>` : '';
+        const lockBadge = lk.locked ? `<span class="qs-lock" title="잠근 자리">${icon('lock', 'ic-sm')} ${lk.all ? '전체' : lk.locked}</span>` : '';
         const short = (t && n < t.onFieldSize ? `<span class="qs-warn">${n}/${t.onFieldSize}</span>` : `<span class="qs-count">${n}명</span>`) + lockBadge;
         return `
           <button type="button" class="qs-card ${q === AppState.currentQuarter ? 'active' : ''}" data-q="${q}">
@@ -335,7 +335,7 @@ function renderSquadTable() {
             const diffStr = p.credit === 0 ? '미출전' : (st === 'gk' ? '전담' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}`);
             const prio = playerPriority(name);
             return `<tr class="squad-row-${st}">
-      <td class="squad-name">${prio === 1 ? '★ ' : ''}${escapeHtml(formatPlayerName(name))}${prio === 3 ? ' <small class="prio-mini">3순위</small>' : ''}</td>
+      <td class="squad-name">${prio === 1 ? icon('star', 'ic-sm ic-gold') + ' ' : ''}${escapeHtml(formatPlayerName(name))}${prio === 3 ? ' <small class="prio-mini">3순위</small>' : ''}</td>
       ${qCells}
       <td class="participation-score ${st}">${fmtQ(p.credit)}</td>
       <td class="num-cell my-target-cell">${fmtQ(myTarget, 1)}</td>
@@ -351,7 +351,7 @@ function renderSquadTable() {
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p class="hint-text" style="margin-top:0.4rem">● 주전 1쿼터 · ◐ 교체 0.5쿼터 · × 불참 쿼터 · 목표는 ${t.onFieldSize}명 × ${t.quarterCount}쿼터 = ${t.slots}슬롯을 우선순위 가중치(★1순위 ×1.25 · 3순위 ×0.75)와 참석 가능 쿼터에 비례해 나눈 값 · 1쿼터 이상 차이 나면 부족/초과</p>`;
+    <p class="hint-text" style="margin-top:0.4rem">● 주전 1쿼터 · ◐ 교체 0.5쿼터 · × 불참 쿼터 · 목표는 ${t.onFieldSize}명 × ${t.quarterCount}쿼터 = ${t.slots}슬롯을 우선순위 가중치(1순위 ×1.25 · 3순위 ×0.75)와 참석 가능 쿼터에 비례해 나눈 값 · 1쿼터 이상 차이 나면 부족/초과</p>`;
 }
 
 // 목표 쿼터 (시트의 "예상 평균쿼터")
@@ -381,8 +381,8 @@ function renderPlaytimeStats() {
     </div>
     <div class="playtime-alert ${t.balanced && !issues.length ? 'success' : 'warning'}">
       ${t.balanced && !issues.length
-            ? `✅ 균형 배정 (최대-최소 ${fmtQ(t.spread)}Q)`
-            : `⚠️ ${t.balanced ? '' : `최대 ${fmtQ(t.max)}Q vs 최소 ${fmtQ(t.min)}Q`}${issues.length ? (t.balanced ? '' : ' · ') + issues.join(' · ') : ''}`}
+            ? `${icon('check')} 균형 배정 (최대-최소 ${fmtQ(t.spread)}Q)`
+            : `${icon('alert')} ${t.balanced ? '' : `최대 ${fmtQ(t.max)}Q vs 최소 ${fmtQ(t.min)}Q`}${issues.length ? (t.balanced ? '' : ' · ') + issues.join(' · ') : ''}`}
     </div>`;
 }
 
@@ -494,6 +494,22 @@ function fbApplySub(q, pos, val) {
     fbRefresh();
 }
 
+// 넓은 화면에서는 피치를 가로로 눕힘 (GK 왼쪽 → 공격 오른쪽). 저장 좌표는 항상 세로 기준.
+function pitchLandscape() {
+    const el = document.getElementById('formation-builder');
+    const parent = el && el.parentElement;
+    const w = parent ? (parent.clientWidth || parent.getBoundingClientRect().width) : 0;
+    return w >= 600; // 배치 카드 폭이 넉넉하면 가로 피치
+}
+function toScreenCoord(coord, landscape) {
+    if (!landscape) return coord;
+    return { left: 100 - coord.top, top: 100 - coord.left };
+}
+function fromScreenCoord(screen, landscape) {
+    if (!landscape) return screen;
+    return { left: 100 - screen.top, top: 100 - screen.left };
+}
+
 // 포지션 카드 좌표: 사용자 드래그 오버라이드 → 포메이션 기본값 순
 function getPosCoord(q, pos, fType) {
     const custom = AppState.formationCoords && AppState.formationCoords[q] && AppState.formationCoords[q][pos];
@@ -528,15 +544,15 @@ function renderFormationBuilder() {
             const credit = p ? p.credit : 0;
             const st = t ? (credit === 0 ? 'unplayed' : t.status[n]) : '';
             const myT = t ? (t.personalTarget[n] != null ? t.personalTarget[n] : t.target) : 0;
-            return `<button type="button" class="bench-chip ${st} ${isGuest(n) ? 'is-guest' : ''} ${pending === n ? 'pending' : ''}" data-name="${escapeHtml(n)}">${playerPriority(n) === 1 ? '★' : ''}${escapeHtml(n)}<em>${fmtQ(credit)}${t ? `/${fmtQ(myT, 1)}` : ''}</em></button>`;
+            return `<button type="button" class="bench-chip ${st} ${isGuest(n) ? 'is-guest' : ''} ${pending === n ? 'pending' : ''}" data-name="${escapeHtml(n)}">${playerPriority(n) === 1 ? icon('star', 'ic-sm ic-gold') : ''}${escapeHtml(n)}<em>${fmtQ(credit)}${t ? `/${fmtQ(myT, 1)}` : ''}</em></button>`;
         }).join('');
         const extraHtml = extra.length
             ? `<div class="extra-subs">기타 교체: ${extra.map((sb, i) =>
-                `<span class="extra-sub">${escapeHtml(sb.in || '?')} → ${escapeHtml(sb.out || '?')} <button type="button" class="extra-sub-del" data-idx="${i}" title="삭제">✕</button></span>`).join(' ')}</div>`
+                `<span class="extra-sub">${escapeHtml(sb.in || '?')} → ${escapeHtml(sb.out || '?')} <button type="button" class="extra-sub-del" data-idx="${i}" title="삭제">${icon('close', 'ic-sm')}</button></span>`).join(' ')}</div>`
             : '';
         bench.innerHTML = `
       <div class="bench-head">
-        <span class="bench-title">${q} 벤치 <span class="bench-count">${benchPlayers.length}</span></span>
+        <span class="bench-title">${icon('users', 'ic-sm')} ${q} 벤치 <span class="bench-count">${benchPlayers.length}</span></span>
         <span class="bench-hint">${pending ? `<strong>${escapeHtml(pending)}</strong> 선택됨 → 피치의 자리를 누르세요` : '선수를 누른 뒤 자리를 누르거나, 자리를 눌러 고르세요 · 숫자는 참여/목표'}</span>
       </div>
       <div class="bench-chips">${
@@ -558,9 +574,10 @@ function renderFormationBuilder() {
 
     const locks = AppState.locks[q] || {};
     const reasons = AppState.draftReasons[q] || {};
+    const landscape = pitchLandscape();
     function buildPosCell(pos) {
         const label = (POSITION_DISPLAY_LABELS[fType] || {})[pos] || pos;
-        const coord = getPosCoord(q, pos, fType);
+        const coord = toScreenCoord(getPosCoord(q, pos, fType), landscape);
         const rowKey = getPosRowKey(pos, fType);
         const name = fMap[pos] && fMap[pos] !== '-' ? fMap[pos] : null;
         const sub = fSubs[pos] && fSubs[pos] !== '-' ? fSubs[pos] : null;
@@ -572,17 +589,18 @@ function renderFormationBuilder() {
         const creditHtml = name && t ? `<span class="pos-credit ${t.status[name] || ''}">${fmtQ(p ? p.credit : 0)}</span>` : '';
         return `
       <div class="pos-cell ${name ? 'is-filled' : 'is-empty'} ${sub ? 'has-sub' : ''} ${locked ? 'is-locked' : ''} ${pending ? 'is-target' : ''}" data-pos="${escapeHtml(pos)}" style="left:${coord.left}%;top:${coord.top}%">
-        <button type="button" class="pos-lock-toggle ${locked ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="${locked ? '잠금 해제' : '이 자리 잠그기 (자동 초안이 유지)'}" aria-label="자리 잠금">${locked ? '🔒' : '🔓'}</button>
-        <button type="button" class="pos-sub-toggle ${sub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정" aria-label="교체 선수 지정">⇄</button>
+        <button type="button" class="pos-lock-toggle ${locked ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="${locked ? '잠금 해제' : '이 자리 잠그기 (자동 초안이 유지)'}" aria-label="자리 잠금">${icon(locked ? 'lock' : 'unlock')}</button>
+        <button type="button" class="pos-sub-toggle ${sub ? 'active' : ''}" data-pos="${escapeHtml(pos)}" title="교체 선수 지정" aria-label="교체 선수 지정">${icon('swap')}</button>
         <div class="pos-badge pos-badge-${rowKey}" title="드래그하여 위치 이동">${escapeHtml(label)}</div>
         <button type="button" class="pos-name ${name ? '' : 'empty'}" data-pos="${escapeHtml(pos)}" aria-label="${escapeHtml(label)} 선수 선택">${name ? escapeHtml(name) : '+ 선택'}${creditHtml}</button>
-        ${sub ? `<button type="button" class="pos-sub-line" data-pos="${escapeHtml(pos)}" title="교체 변경">⇄ ${escapeHtml(sub)}</button>` : ''}
+        ${sub ? `<button type="button" class="pos-sub-line" data-pos="${escapeHtml(pos)}" title="교체 변경">${icon('swap', 'ic-sm')} ${escapeHtml(sub)}</button>` : ''}
         ${reasonHtml}
       </div>`;
     }
 
     const positionsHtml = getFormationPositions(q, fType).map(pos => buildPosCell(pos)).join('');
     updateLockQuarterButton();
+    container.classList.toggle('landscape', landscape);
     container.innerHTML = `
     <div class="pitch-title">FC BARZA · ${escapeHtml(q)} · ${escapeHtml(fType)}</div>
     <div class="pitch-lines"></div>
@@ -640,7 +658,7 @@ function renderFormationBuilder() {
             const pos = cell.dataset.pos;
             const rect = container.getBoundingClientRect();
             const startX = e.clientX, startY = e.clientY;
-            const topMin = (34 / rect.height) * 100 + 4;
+            const topMin = (30 / rect.height) * 100 + 4;
             let moved = false;
 
             const onMove = ev => {
@@ -649,7 +667,7 @@ function renderFormationBuilder() {
                 cell.classList.add('dragging');
                 let left = ((ev.clientX - rect.left) / rect.width) * 100;
                 let top = ((ev.clientY - rect.top) / rect.height) * 100;
-                left = Math.min(93, Math.max(7, left));
+                left = Math.min(landscape ? 96 : 93, Math.max(landscape ? 4 : 7, left));
                 top = Math.min(95, Math.max(topMin, top));
                 cell.style.left = left.toFixed(1) + '%';
                 cell.style.top = top.toFixed(1) + '%';
@@ -667,7 +685,7 @@ function renderFormationBuilder() {
                 if (moved) {
                     pushUndo();
                     if (!AppState.formationCoords[q]) AppState.formationCoords[q] = {};
-                    AppState.formationCoords[q][pos] = { left: parseFloat(cell.style.left), top: parseFloat(cell.style.top) };
+                    AppState.formationCoords[q][pos] = fromScreenCoord({ left: parseFloat(cell.style.left), top: parseFloat(cell.style.top) }, landscape);
                 } else if (AppState.pendingPick && checkEditorAccess()) {
                     placePending(q, pos); // 카드 아무 곳이나 탭해도 대기 선수 배치
                 }
@@ -695,7 +713,7 @@ function updateLockQuarterButton() {
     const q = AppState.currentQuarter;
     const st = quarterLockState(q);
     btn.disabled = !AppState.isEditor || st.filled === 0;
-    btn.textContent = st.all ? `🔓 ${q} 전체 고정 해제` : `🔒 ${q} 전체 고정${st.locked ? ` (${st.locked}/${st.filled})` : ''}`;
+    btn.innerHTML = st.all ? `${icon('unlock')} ${q} 전체 고정 해제` : `${icon('lock')} ${q} 전체 고정${st.locked ? ` (${st.locked}/${st.filled})` : ''}`;
     btn.classList.toggle('active', st.all);
 }
 
@@ -713,7 +731,7 @@ function toggleQuarterLock() {
     } else {
         const gkWasLocked = !!AppState.locks[q].GK;
         Object.keys(fMap).forEach(p => { if (fMap[p] && fMap[p] !== '-') AppState.locks[q][p] = true; });
-        showToast(`${q} 배치 ${st.filled}자리를 고정했습니다. 자동 초안이 이 쿼터는 유지합니다. 🔒`);
+        showToast(`${q} 배치 ${st.filled}자리를 고정했습니다. 자동 초안이 이 쿼터는 유지합니다.`);
         if (!gkWasLocked && fMap.GK && fMap.GK !== '-') maybeLockGkAllQuarters(q, fMap.GK);
     }
     fbRefresh();
@@ -736,7 +754,7 @@ function maybeLockGkAllQuarters(fromQ, name) {
         if (!AppState.locks[q]) AppState.locks[q] = {};
         AppState.locks[q].GK = true;
     });
-    showToast(`GK ${name}을(를) 전 쿼터에 고정했습니다. 🧤`);
+    showToast(`GK ${name}을(를) 전 쿼터에 고정했습니다.`);
     return true;
 }
 
@@ -781,7 +799,7 @@ function openPickSheet(q, pos, mode) {
         const f = fit(n);
         const fitLabel = f.score >= 2.5 ? AutoDraft.reasonLabel(f) : (f.score > 0 ? AutoDraft.reasonLabel(f) : '');
         return `<button type="button" class="pick-chip ${st} ${extraCls} ${n === current ? 'current' : ''}" data-name="${escapeHtml(n)}">
-          <span class="pick-name">${playerPriority(n) === 1 ? '★ ' : ''}${escapeHtml(n)}${isGuest(n) ? '<small>용병</small>' : ''}${playerPriority(n) === 3 ? '<small>3순위</small>' : ''}</span>
+          <span class="pick-name">${playerPriority(n) === 1 ? icon('star', 'ic-sm ic-gold') + ' ' : ''}${escapeHtml(n)}${isGuest(n) ? '<small>용병</small>' : ''}${playerPriority(n) === 3 ? '<small>3순위</small>' : ''}</span>
           <span class="pick-meta">${prefs(n).slice(0, 2).join('·') || '-'}${fitLabel ? ` · <b>${escapeHtml(fitLabel)}</b>` : ''}</span>
           <span class="pick-credit">${fmtQ(credit)}${t ? `/${fmtQ(t.personalTarget[n] != null ? t.personalTarget[n] : t.target, 1)}` : ''}</span>
         </button>`;
@@ -790,7 +808,7 @@ function openPickSheet(q, pos, mode) {
     let html = `<div class="pick-head">
         <span class="pos-badge pos-badge-${getPosRowKey(pos, fType)}">${escapeHtml(label)}</span>
         <span class="pick-title">${mode === 'sub' ? `교체 투입 선수 선택 <small>(${escapeHtml(fMap[pos] || '')} 아웃)</small>` : `${q} ${escapeHtml(label)} 선수 선택`}</span>
-        <button type="button" class="pick-close" data-close="1" aria-label="닫기">✕</button>
+        <button type="button" class="pick-close" data-close="1" aria-label="닫기">${icon('close')}</button>
       </div>`;
     html += `<div class="pick-section"><div class="pick-section-title">벤치 <small>${benchNames.length}명 · 적합도순</small></div>
         <div class="pick-list">${sortByFit(benchNames).map(n => chip(n)).join('') || '<span class="empty-hint">벤치에 선수가 없습니다.</span>'}</div>
@@ -845,7 +863,7 @@ function runAutoDraft() {
     const hasAny = qs.some(q => Object.keys(AppState.formationState[q] || {}).length > 0);
     const lockCount = qs.reduce((n, q) => n + Object.keys(AppState.locks[q] || {}).filter(p => AppState.formationState[q] && AppState.formationState[q][p]).length, 0);
     if (hasAny && AppState.draftSeed === 0) {
-        if (!confirm(`기존 배치를 자동 초안으로 덮어씁니다.${lockCount ? ` 잠근 ${lockCount}자리는 유지됩니다.` : ' (유지할 자리는 🔒 로 잠근 뒤 실행하세요)'} 계속할까요?`)) return;
+        if (!confirm(`기존 배치를 자동 초안으로 덮어씁니다.${lockCount ? ` 잠근 ${lockCount}자리는 유지됩니다.` : ' (유지할 자리는 잠근 뒤 실행하세요)'} 계속할까요?`)) return;
     }
     const positions = {};
     AppState.attendees.forEach(n => { positions[n] = (getPlayer(n) || {}).positions || []; });
@@ -885,9 +903,9 @@ function runAutoDraft() {
     });
     fbRefresh();
     const t = editorTargets();
-    const msg = `✨ 초안 ${AppState.draftSeed}번째 · 목표 ${fmtQ(t.target)}Q · 실제 ${fmtQ(t.min)}~${fmtQ(t.max)}Q${result.subCount ? ` · 교체 ${result.subCount}건` : ''}`;
+    const msg = `초안 ${AppState.draftSeed}번째 · 목표 ${fmtQ(t.target)}Q · 실제 ${fmtQ(t.min)}~${fmtQ(t.max)}Q${result.subCount ? ` · 교체 ${result.subCount}건` : ''}`;
     showToast(msg, result.warnings.length ? 'error' : 'success');
-    result.warnings.forEach(w => showToast('⚠️ ' + w, 'error'));
+    result.warnings.forEach(w => showToast(w, 'error'));
 }
 
 // ── 이벤트 → 스코어/스탯 자동 계산 ─────────────────────────────────────────
@@ -950,9 +968,9 @@ function renderLiveRecorder() {
         const fields = ev.type === 'goal'
             ? `<select class="ev-edit-quarter" aria-label="쿼터">${quarterOptions(ev.quarter)}</select>
                <select class="ev-edit-scorer" aria-label="득점자">${playerOptionsWith(ev.scorer)}</select>
-               <select class="ev-edit-assister" aria-label="도움"><option value="">👟 도움 없음</option>${playerOptionsWith(ev.assister)}</select>`
+               <select class="ev-edit-assister" aria-label="도움"><option value="">도움 없음</option>${playerOptionsWith(ev.assister)}</select>`
             : `<select class="ev-edit-quarter" aria-label="쿼터">${quarterOptions(ev.quarter)}</select>
-               <span class="ev-edit-label">🔴 상대팀 득점</span>`;
+               <span class="ev-edit-label">상대팀 득점</span>`;
         return `<div class="event-item event-edit-form">
               <div class="ev-edit-fields">${fields}</div>
               <div class="ev-edit-actions">
@@ -971,14 +989,14 @@ function renderLiveRecorder() {
                 const globalIdx = AppState.matchEvents.indexOf(ev);
                 if (globalIdx === AppState.editingEventIdx) return buildEditForm(ev, globalIdx);
                 const actions = `<span class="event-actions">
-                      <button class="event-edit" data-idx="${globalIdx}" title="수정">✎</button>
-                      <button class="event-delete" data-idx="${globalIdx}" title="삭제">✕</button>
+                      <button class="event-edit" data-idx="${globalIdx}" title="수정">${icon('edit', 'ic-sm')}</button>
+                      <button class="event-delete" data-idx="${globalIdx}" title="삭제">${icon('close', 'ic-sm')}</button>
                     </span>`;
                 if (ev.type === 'goal') {
-                    const assStr = ev.assister ? `, 👟 ${escapeHtml(ev.assister)}` : '';
-                    return `<div class="event-item event-goal"><span>⚽ ${escapeHtml(ev.scorer)}${assStr}</span>${actions}</div>`;
+                    const assStr = ev.assister ? ` <small>${icon('assist', 'ic-sm')} ${escapeHtml(ev.assister)}</small>` : '';
+                    return `<div class="event-item event-goal"><span>${icon('ball', 'ic-gold')} ${escapeHtml(ev.scorer)}${assStr}</span>${actions}</div>`;
                 }
-                return `<div class="event-item event-opponent"><span>🔴 상대팀 득점</span>${actions}</div>`;
+                return `<div class="event-item event-opponent"><span>${icon('target', 'ic-red')} 상대팀 득점</span>${actions}</div>`;
             }).join('');
 
         return `<div class="event-quarter-block ${q === lq ? 'active-quarter' : ''}">
@@ -993,7 +1011,7 @@ function renderLiveRecorder() {
     // 이벤트 로그가 없는 기록(시트 이관분)은 쿼터 스코어/선수 스탯을 직접 입력
     const manualHtml = !hasEvents ? `
     <details class="manual-score" ${AppState.editModeId ? 'open' : ''}>
-      <summary>✍️ 스코어·골·어시스트 직접 입력 (이벤트 로그 없이 합계만 기록)</summary>
+      <summary>${icon('edit', 'ic-sm')} 스코어·골·어시스트 직접 입력 (이벤트 로그 없이 합계만 기록)</summary>
       <div class="manual-score-grid">
         ${editorQuarters().map(q => `
           <label>${q}
@@ -1003,7 +1021,7 @@ function renderLiveRecorder() {
           </label>`).join('')}
       </div>
       <table class="manual-stats-table">
-        <thead><tr><th>이름</th><th>⚽ 골</th><th>👟 도움</th></tr></thead>
+        <thead><tr><th>이름</th><th>골</th><th>도움</th></tr></thead>
         <tbody>${AppState.attendees.map(n => {
             const s = AppState.matchStats[n] || { goals: 0, assists: 0 };
             return `<tr><td>${escapeHtml(formatPlayerName(n))}</td>
@@ -1026,17 +1044,17 @@ function renderLiveRecorder() {
       </div>
       <div class="live-action-row">
         <select id="live-scorer" class="live-select">
-          <option value="">⚽ 득점자 선택</option>
+          <option value="">득점자 선택</option>
           ${playerOpts}
         </select>
         <select id="live-assister" class="live-select">
-          <option value="">👟 어시스트 없음</option>
+          <option value="">어시스트 없음</option>
           ${playerOpts}
         </select>
-        <button id="live-add-goal" class="btn-goal">⚽ 골!</button>
+        <button id="live-add-goal" class="btn-goal">${icon('ball')} 골!</button>
       </div>
       <div class="live-action-row" style="margin-top:0.3rem">
-        <button id="live-add-opponent-goal" class="btn-opponent-goal">🔴 상대팀 득점</button>
+        <button id="live-add-opponent-goal" class="btn-opponent-goal">${icon('target')} 상대팀 득점</button>
       </div>
     </div>
 
@@ -1057,14 +1075,14 @@ function renderLiveRecorder() {
         AppState.matchEvents.push({ quarter: AppState.liveQuarter, type: 'goal', scorer, assister: assister || null });
         recalcFromEvents();
         renderLiveRecorder();
-        showToast(`⚽ ${scorer} 골!${assister ? ` (👟 ${assister})` : ''}`);
+        showToast(`${scorer} 골!${assister ? ` (도움 ${assister})` : ''}`);
     });
 
     document.getElementById('live-add-opponent-goal').addEventListener('click', () => {
         AppState.matchEvents.push({ quarter: AppState.liveQuarter, type: 'opponentGoal', scorer: null, assister: null });
         recalcFromEvents();
         renderLiveRecorder();
-        showToast('🔴 상대팀 득점');
+        showToast('상대팀 득점');
     });
 
     container.querySelectorAll('.event-delete').forEach(btn => {
@@ -1103,7 +1121,7 @@ function renderLiveRecorder() {
             AppState.liveQuarter = newQuarter;
             recalcFromEvents();
             renderLiveRecorder();
-            showToast('기록을 수정했습니다. ✏️');
+            showToast('기록을 수정했습니다.');
         });
     });
 
@@ -1176,9 +1194,9 @@ function updateAutoSaveStatus() {
         const t = AppState.lastAutoSave;
         const hh = String(t.getHours()).padStart(2, '0');
         const mm = String(t.getMinutes()).padStart(2, '0');
-        el.textContent = `💾 자동저장: ${hh}:${mm} (2분 간격, 새 경기만)`;
+        el.innerHTML = `${icon('save', 'ic-sm')} 자동저장: ${hh}:${mm} (2분 간격, 새 경기만)`;
     } else {
-        el.textContent = '💾 자동저장: 새 경기는 2분 간격으로 임시 저장됩니다';
+        el.innerHTML = `${icon('save', 'ic-sm')} 자동저장: 새 경기는 2분 간격으로 임시 저장됩니다`;
     }
 }
 
@@ -1292,7 +1310,7 @@ function initTab1Events() {
         AppState.formationCoords[q] = {};
         renderFormationBuilder();
         renderFormationOverview();
-        showToast(`${q} 포지션 위치를 기본 배치로 되돌렸습니다. ↺`);
+        showToast(`${q} 포지션 위치를 기본 배치로 되돌렸습니다.`);
     });
 
     document.getElementById('export-formation-btn').addEventListener('click', exportCombinedFormation);
@@ -1337,6 +1355,17 @@ function initTab1Events() {
     // 좁은 화면에서는 경기 정보를 접어 두고 요약 줄만 보여줌
     const infoDetails = document.querySelector('#step-info .info-details');
     if (infoDetails && window.innerWidth < 700) infoDetails.open = false;
+
+    // 화면 폭이 바뀌면 피치 가로/세로 모드 재계산
+    let resizeTimer = null;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            const el = document.getElementById('formation-builder');
+            if (!el) return;
+            if (el.classList.contains('landscape') !== pitchLandscape()) renderFormationBuilder();
+        }, 150);
+    });
 
     startAutoSave();
     updateAutoSaveStatus();
@@ -1429,11 +1458,11 @@ async function handleSave(isDraft, overwrite = false, forceNewId = false) {
         AppState.editModeId = record.id; // 저장 후에는 같은 레코드를 계속 수정
         hideDuplicateWarning();
         updateEditModeNotice();
-        showToast(`${isDraft ? '임시 저장' : '확정 저장'} 완료! ✅`);
+        showToast(`${isDraft ? '임시 저장' : '확정 저장'} 완료!`);
         if (!isDraft) {
             const totUs = Object.values(record.scores).reduce((a, s) => a + s[0], 0);
             const totThem = Object.values(record.scores).reduce((a, s) => a + s[1], 0);
-            showToast(`최종 스코어: 바르자 ${totUs} : ${totThem} ${record.opponent} 🎉`, 'success');
+            showToast(`최종 스코어: 바르자 ${totUs} : ${totThem} ${record.opponent}`, 'success');
         }
     } catch (e) {
         showToast('저장 실패: ' + e.message, 'error');
@@ -1445,7 +1474,7 @@ function renderDuplicateWarning(dup, isDraft) {
     if (!el) return;
     el.innerHTML = `
     <div class="dup-box">
-      <p>⚠️ <strong>${escapeHtml(dup.date)}</strong> 날짜에 이미 <strong>${escapeHtml(dup.title)}</strong> 기록이 있습니다.</p>
+      <p>${icon('alert', 'ic-gold')} <strong>${escapeHtml(dup.date)}</strong> 날짜에 이미 <strong>${escapeHtml(dup.title)}</strong> 기록이 있습니다.</p>
       <div class="dup-actions">
         <button class="btn-overwrite" id="dup-overwrite">덮어쓰기 (${isDraft ? '임시' : '확정'})</button>
         <button class="btn-secondary" id="dup-new">같은 날 다른 경기로 저장</button>
@@ -1533,7 +1562,7 @@ function loadMatchToEditor(record) {
     startAutoSave();
     setTimeout(() => {
         switchTab('tab1');
-        showToast(`"${record.title}" 불러오기 완료 ✏️`);
+        showToast(`"${record.title}" 불러오기 완료`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 0);
 }

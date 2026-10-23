@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>⚽ FC 바르자 팀 매니저</title>
+  <title>FC 바르자 팀 매니저</title>
   <meta name="description" content="FC 바르자 풋살팀 운영 시스템 - 포메이션, 스쿼드, 시즌 스탯 관리">
   <!-- Pretendard 폰트 -->
   <link rel="stylesheet"
@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-  <link rel="stylesheet" href="css/style.css?v=20261024o">
+  <link rel="stylesheet" href="css/style.css?v=20261025d">
 
   <!-- Firebase SDK (익명 인증 — DB 쓰기 권한 확보용) -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -23,11 +23,58 @@
 
 <body>
 
+  <!-- 아이콘 스프라이트 (선형 아이콘, currentColor) -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16M7 16V9M12 16V4M17 16v-5"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 15l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M3 7v6h6M21 17a9 9 0 0 0-15-6.7L3 13"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M21 7v6h-6M3 17a9 9 0 0 1 15-6.7L21 13"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></symbol>
+    <symbol id="i-pitch" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="1"/><path d="M12 4v16M2 9h4v6H2M22 9h-4v6h4"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-ball" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 7l4.8 3.5-1.8 5.5H9L7.2 10.5zM12 7V2.3M16.8 10.5l4.5-1.5M15 16l2.8 3.8M9 16l-2.8 3.8M7.2 10.5L2.7 9"/></symbol>
+    <symbol id="i-assist" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-google" viewBox="0 0 24 24"><path d="M21.35 11.1H12v2.9h5.3c-.5 2.4-2.6 3.9-5.3 3.9a6 6 0 1 1 3.9-10.5l2.1-2.1A9 9 0 1 0 12 21c5 0 9-3.6 9-9 0-.3 0-.6-.1-.9z"/></symbol>
+    <symbol id="i-shirt" viewBox="0 0 24 24"><path d="M20.4 4.6L16 3l-2 3h-4L8 3 3.6 4.6 2 9l3 1v11h14V10l3-1z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><path d="M9 2h6v4H9zM16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v1M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-5.9-2.6L3.3 15.4a2 2 0 0 1 3-2.6L8 15"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></symbol>
+  </svg>
+
   <!-- ========== HEADER ========== -->
   <header class="app-header">
     <div class="header-logo">
-      <span class="badge">⚽</span>
-      <span class="name">FC 바르자 팀 매니저</span>
+      <span class="badge"><svg class="ic" aria-hidden="true"><use href="#i-ball"></use></svg></span>
+      <span class="name">FC 바르자 <small>팀 매니저</small></span>
     </div>
     <div class="header-right">
       <span id="auth-status">DB 연결 중...</span>
@@ -35,7 +82,7 @@
         <button id="auth-btn" class="auth-btn">⏳ 로딩 중</button>
         <div id="auth-menu" class="auth-menu" style="display:none">
           <div id="auth-menu-user" class="auth-menu-user"></div>
-          <button type="button" id="auth-signout" class="btn-secondary">로그아웃</button>
+          <button type="button" id="auth-signout" class="btn-secondary btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-logout"></use></svg> 로그아웃</button>
         </div>
       </div>
     </div>
@@ -43,10 +90,10 @@
 
   <!-- ========== TAB NAVIGATION ========== -->
   <nav class="tab-nav">
-    <button class="tab-btn active" data-tab="tab1">📋 당일 경기 운영</button>
-    <button class="tab-btn" data-tab="tab2">📈 시즌 스탯</button>
-    <button class="tab-btn" data-tab="tab3">📚 기록 조회 &amp; 수정</button>
-    <button class="tab-btn" data-tab="tab4">👥 선수단 관리</button>
+    <button class="tab-btn active" data-tab="tab1"><svg class="ic" aria-hidden="true"><use href="#i-pitch"></use></svg><span>경기 운영</span></button>
+    <button class="tab-btn" data-tab="tab2"><svg class="ic" aria-hidden="true"><use href="#i-chart"></use></svg><span>시즌 스탯</span></button>
+    <button class="tab-btn" data-tab="tab3"><svg class="ic" aria-hidden="true"><use href="#i-book"></use></svg><span>기록</span></button>
+    <button class="tab-btn" data-tab="tab4"><svg class="ic" aria-hidden="true"><use href="#i-users"></use></svg><span>선수단</span></button>
   </nav>
 
   <!-- ========== MAIN CONTENT ========== -->
@@ -120,7 +167,7 @@
             <details class="step-details" open>
             <summary class="step-title">참석 체크 <span id="attend-summary-text" class="step-summary"></span></summary>
             <div class="attend-tools">
-              <input type="search" id="attend-filter" placeholder="🔍 명단에서 이름 검색" autocomplete="off" aria-label="명단 검색">
+              <input type="search" id="attend-filter" placeholder="명단에서 이름 검색" autocomplete="off" aria-label="명단 검색">
               <div class="guest-add-row">
                 <span class="guest-add-label">용병 추가</span>
                 <input type="text" id="guest-name-input" placeholder="이름" aria-label="용병 이름">
@@ -161,18 +208,18 @@
                   <option value="4-4-2">4-4-2</option>
                   <option value="3-5-2">3-5-2</option>
                 </select>
-                <button id="formation-reset-btn" class="btn-icon" type="button" title="포지션 위치를 기본 배치로 초기화">↺</button>
+                <button id="formation-reset-btn" class="btn-icon" type="button" title="포지션 위치를 기본 배치로 초기화"><svg class="ic" aria-hidden="true"><use href="#i-refresh"></use></svg></button>
               </div>
             </div>
 
             <div class="draft-toolbar">
-              <button id="auto-draft-btn" class="btn-secondary editor-only" type="button" title="참석자의 선호 포지션과 쿼터 균형을 반영해 전 쿼터 라인업 초안을 만듭니다">✨ 자동 초안</button>
-              <button id="lock-quarter-btn" class="btn-secondary editor-only" type="button" title="이 쿼터에 배치된 자리를 모두 잠가 자동 초안이 바꾸지 않게 합니다">🔒 이 쿼터 전체 고정</button>
+              <button id="auto-draft-btn" class="btn-primary btn-sm editor-only" type="button" title="참석자의 선호 포지션과 쿼터 균형을 반영해 전 쿼터 라인업 초안을 만듭니다"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"></use></svg> 자동 초안</button>
+              <button id="lock-quarter-btn" class="btn-secondary btn-sm editor-only" type="button" title="이 쿼터에 배치된 자리를 모두 잠가 자동 초안이 바꾸지 않게 합니다"><svg class="ic" aria-hidden="true"><use href="#i-lock"></use></svg> 이 쿼터 전체 고정</button>
               <span class="undo-group">
-                <button id="undo-btn" class="btn-icon" type="button" title="실행 취소 (Ctrl+Z)" disabled>↶</button>
-                <button id="redo-btn" class="btn-icon" type="button" title="다시 실행 (Ctrl+Shift+Z)" disabled>↷</button>
+                <button id="undo-btn" class="btn-icon" type="button" title="실행 취소 (Ctrl+Z)" disabled><svg class="ic" aria-hidden="true"><use href="#i-undo"></use></svg></button>
+                <button id="redo-btn" class="btn-icon" type="button" title="다시 실행 (Ctrl+Shift+Z)" disabled><svg class="ic" aria-hidden="true"><use href="#i-redo"></use></svg></button>
               </span>
-              <span class="hint-text">선호 포지션 + 쿼터 균형 · 🔒 잠근 자리 유지 · 다시 누르면 다른 조합</span>
+              <span class="hint-text">선호 포지션 + 쿼터 균형 · 잠근 자리는 유지 · 다시 누르면 다른 조합</span>
             </div>
 
             <div id="formation-bench" class="formation-bench"></div>
@@ -181,7 +228,7 @@
 
             <div class="quarter-strip-head">
               <span class="quarter-strip-title">전체 쿼터 요약</span>
-              <button id="export-formation-btn" class="btn-secondary btn-sm">📸 이미지 저장</button>
+              <button id="export-formation-btn" class="btn-secondary btn-sm"><svg class="ic" aria-hidden="true"><use href="#i-camera"></use></svg> 이미지 저장</button>
             </div>
             <div id="quarter-strip" class="quarter-strip"></div>
             </details>
@@ -202,9 +249,9 @@
         <div class="step-title">저장</div>
         <div id="autosave-status" style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem"></div>
         <div class="save-buttons-row">
-          <button id="new-match-btn" class="editor-only">새 경기</button>
-          <button id="draft-save-btn" class="editor-only">임시 저장</button>
-          <button id="final-save-btn" class="btn-primary editor-only">확정 저장 (통계 반영)</button>
+          <button id="new-match-btn" class="btn-secondary editor-only"><svg class="ic" aria-hidden="true"><use href="#i-file"></use></svg> 새 경기</button>
+          <button id="draft-save-btn" class="btn-secondary editor-only"><svg class="ic" aria-hidden="true"><use href="#i-save"></use></svg> 임시 저장</button>
+          <button id="final-save-btn" class="btn-primary editor-only"><svg class="ic" aria-hidden="true"><use href="#i-check"></use></svg> 확정 저장 <small>통계 반영</small></button>
         </div>
         <div id="duplicate-warning" style="display:none"></div>
       </section>
@@ -225,7 +272,7 @@
     <div id="tab2" class="tab-panel">
       <div id="tab2-content">
         <div class="empty-state">
-          <p>⚽ 시즌 통계를 불러오는 중...</p>
+          <p>시즌 통계를 불러오는 중...</p>
         </div>
       </div>
     </div>
@@ -236,7 +283,7 @@
     <div id="tab3" class="tab-panel">
       <div id="tab3-content">
         <div class="empty-state">
-          <p>📚 경기 기록을 불러오는 중...</p>
+          <p>경기 기록을 불러오는 중...</p>
         </div>
       </div>
     </div>
@@ -247,7 +294,7 @@
     <div id="tab4" class="tab-panel">
       <div id="tab4-content">
         <div class="empty-state">
-          <p>👥 선수단 명단을 불러오는 중...</p>
+          <p>선수단 명단을 불러오는 중...</p>
         </div>
       </div>
     </div>
@@ -258,16 +305,16 @@
   <div id="toast-container"></div>
 
   <!-- ========== SCRIPTS ========== -->
-  <script src="js/config.js?v=20261024o"></script>
-  <script src="js/quota.js?v=20261024o"></script>
-  <script src="js/autodraft.js?v=20261024o"></script>
-  <script src="js/app.js?v=20261024o"></script>
-  <script src="js/drive.js?v=20261024o"></script>
-  <script src="js/formation.js?v=20261024o"></script>
-  <script src="js/tab1_match.js?v=20261024o"></script>
-  <script src="js/tab2_stats.js?v=20261024o"></script>
-  <script src="js/tab3_history.js?v=20261024o"></script>
-  <script src="js/tab4_roster.js?v=20261024o"></script>
+  <script src="js/config.js?v=20261025d"></script>
+  <script src="js/quota.js?v=20261025d"></script>
+  <script src="js/autodraft.js?v=20261025d"></script>
+  <script src="js/app.js?v=20261025d"></script>
+  <script src="js/drive.js?v=20261025d"></script>
+  <script src="js/formation.js?v=20261025d"></script>
+  <script src="js/tab1_match.js?v=20261025d"></script>
+  <script src="js/tab2_stats.js?v=20261025d"></script>
+  <script src="js/tab3_history.js?v=20261025d"></script>
+  <script src="js/tab4_roster.js?v=20261025d"></script>
 
 </body>
 

@@ -10,17 +10,17 @@ function renderHistoryTab(selectId) {
   const startIdx = selectId ? Math.max(0, history.findIndex(m => m.id === selectId)) : 0;
 
   if (history.length === 0) {
-    container.innerHTML = '<div class="empty-state"><p>📭 저장된 경기 기록이 없습니다.</p></div>';
+    container.innerHTML = `<div class="empty-state">${icon('inbox')}<p>저장된 경기 기록이 없습니다.</p></div>`;
     return;
   }
 
   const optionsHtml = history.map((m, i) => {
-    const icon = m.status === 'draft' ? '📝' : (m.type === 'intra' ? '🔁' : '✅');
-    return `<option value="${i}" ${i === startIdx ? 'selected' : ''}>${icon} ${escapeHtml(m.date)} — ${escapeHtml(m.venue)} vs ${escapeHtml(m.opponent)}</option>`;
+    const mark = m.status === 'draft' ? '[임시]' : (m.type === 'intra' ? '[자체전]' : '');
+    return `<option value="${i}" ${i === startIdx ? 'selected' : ''}>${escapeHtml(m.date)}${mark ? ' ' + mark : ''} — ${escapeHtml(m.venue)} vs ${escapeHtml(m.opponent)}</option>`;
   }).join('');
 
   container.innerHTML = `
-    ${AppState.legacyMatches ? '<div class="role-notice-banner">⚠️ DB가 구버전 형식입니다. 스프레드시트 이관(tools/import_sheet.py --upload)을 실행하면 전체 기록이 표시됩니다.</div>' : ''}
+    ${AppState.legacyMatches ? '<div class="role-notice-banner">DB가 구버전 형식입니다. 스프레드시트 이관(tools/import_sheet.py --upload)을 실행하면 전체 기록이 표시됩니다.</div>' : ''}
     <div class="history-selector-row">
       <select id="history-match-select" class="history-select">
         ${optionsHtml}
@@ -42,8 +42,8 @@ function buildTimelineHtml(events, scores, quarters) {
     const [u, t] = scores[q] || [0, 0];
     const rows = evs.map(ev => {
       if (ev.type === 'goal') {
-        const ass = ev.assister ? `<span class="tl-assist">👟 ${escapeHtml(ev.assister)}</span>` : '';
-        return `<div class="tl-row us"><div class="tl-card">⚽ <strong>${escapeHtml(ev.scorer)}</strong>${ass}</div></div>`;
+        const ass = ev.assister ? `<span class="tl-assist">${icon('assist', 'ic-sm')} ${escapeHtml(ev.assister)}</span>` : '';
+        return `<div class="tl-row us"><div class="tl-card">${icon('ball', 'ic-gold')} <strong>${escapeHtml(ev.scorer)}</strong>${ass}</div></div>`;
       }
       return `<div class="tl-row them"><div class="tl-card">상대팀 득점</div></div>`;
     }).join('');
@@ -53,7 +53,7 @@ function buildTimelineHtml(events, scores, quarters) {
     </div>`;
   }).join('');
   if (!blocks) return '<p class="empty-hint">기록된 이벤트가 없습니다.</p>';
-  return `<div class="tl-legend"><span class="tl-legend-us">◀ FC 바르자</span><span class="tl-legend-them">상대팀 ▶</span></div>${blocks}`;
+  return `<div class="tl-legend"><span class="tl-legend-us">FC 바르자</span><span class="tl-legend-them">상대팀</span></div>${blocks}`;
 }
 
 function renderMatchDetail(match) {
@@ -97,7 +97,7 @@ function renderMatchDetail(match) {
     const pts = r.g + r.a;
     const cls = pts === 0 ? 'stat-dim' : (maxPts > 0 && pts === maxPts ? 'stat-top' : '');
     return `<tr class="${cls}">
-      <td>${cls === 'stat-top' ? '⭐ ' : ''}${escapeHtml(r.name)}</td>
+      <td>${cls === 'stat-top' ? icon('star', 'ic-gold ic-sm') + ' ' : ''}${escapeHtml(r.name)}</td>
       <td class="num-cell">${r.g || ''}</td>
       <td class="num-cell">${r.a || ''}</td>
       <td class="num-cell">${r.q ? fmtQ(r.q) : ''}</td>
@@ -142,20 +142,20 @@ function renderMatchDetail(match) {
     ? `<img class="formation-image" src="${buildCombinedFormationImage(plan, subsMap, types, coords, quarters)}" alt="포메이션">`
     : '<p class="empty-hint">저장된 포메이션 데이터가 없습니다.</p>';
 
-  const sourceTag = match.source && match.source.kind === 'sheet' ? ' · 📄 스프레드시트' : '';
+  const sourceTag = match.source && match.source.kind === 'sheet' ? ` · ${icon('file', 'ic-sm')} 스프레드시트` : '';
   const metaExtra = [match.timeSlot, match.notes].filter(Boolean).map(escapeHtml).join(' · ');
 
   container.innerHTML = `
     <div class="match-hero">
       <div class="hero-top">
         <div class="hero-badges">
-          <span class="status-badge ${isDraft ? 'draft' : 'final'}">${isDraft ? '📝 임시' : '✅ 확정'}</span>
+          <span class="status-badge ${isDraft ? 'draft' : 'final'}">${isDraft ? icon('edit', 'ic-sm') + ' 임시' : icon('check', 'ic-sm') + ' 확정'}</span>
           <span class="hero-result-chip ${resultKey}">${resultLabel}</span>
-          ${match.type === 'intra' ? '<span class="status-badge draft">🔁 자체전 (통계 제외)</span>' : ''}
+          ${match.type === 'intra' ? `<span class="status-badge draft">${icon('swap', 'ic-sm')} 자체전 (통계 제외)</span>` : ''}
         </div>
         <div class="match-actions">
-          <button class="btn-hero-action editor-only" data-action="edit-match">✏️ 수정</button>
-          <button class="btn-hero-action danger editor-only" data-action="delete-match">🗑️ 삭제</button>
+          <button class="btn-hero-action editor-only" data-action="edit-match">${icon('edit')} 수정</button>
+          <button class="btn-hero-action danger editor-only" data-action="delete-match">${icon('trash')} 삭제</button>
         </div>
       </div>
 
@@ -165,23 +165,23 @@ function renderMatchDetail(match) {
         <div class="hero-team">${escapeHtml(match.opponent || '상대팀')}</div>
       </div>
 
-      <div class="hero-meta">📅 ${escapeHtml(match.date)} &nbsp;·&nbsp; 📍 ${escapeHtml(match.venue)}${metaExtra ? ' &nbsp;·&nbsp; ' + metaExtra : ''}${sourceTag}</div>
+      <div class="hero-meta">${icon('calendar', 'ic-sm')} ${escapeHtml(match.date)} &nbsp;·&nbsp; ${icon('pin', 'ic-sm')} ${escapeHtml(match.venue)}${metaExtra ? ' &nbsp;·&nbsp; ' + metaExtra : ''}${sourceTag}</div>
       <div class="hero-quarters">${quarterChips}</div>
     </div>
 
     <div class="card detail-card">
       <div class="detail-tabs">
-        ${hasTimeline ? '<button class="detail-tab-btn active" data-dtab="dt-timeline">⏱️ 타임라인</button>' : ''}
-        <button class="detail-tab-btn ${hasTimeline ? '' : 'active'}" data-dtab="dt-stats">📊 스탯</button>
-        <button class="detail-tab-btn" data-dtab="dt-formation">🏟️ 포메이션</button>
-        <button class="detail-tab-btn" data-dtab="dt-squad">📋 명단·쿼터</button>
+        ${hasTimeline ? `<button class="detail-tab-btn active" data-dtab="dt-timeline">${icon('clock')} 타임라인</button>` : ''}
+        <button class="detail-tab-btn ${hasTimeline ? '' : 'active'}" data-dtab="dt-stats">${icon('chart')} 스탯</button>
+        <button class="detail-tab-btn" data-dtab="dt-formation">${icon('pitch')} 포메이션</button>
+        <button class="detail-tab-btn" data-dtab="dt-squad">${icon('clipboard')} 명단·쿼터</button>
       </div>
 
       ${hasTimeline ? `<div id="dt-timeline" class="detail-tab-panel">${buildTimelineHtml(events, scores, quarters)}</div>` : ''}
 
       <div id="dt-stats" class="detail-tab-panel" ${hasTimeline ? 'style="display:none"' : ''}>
         <table class="stats-table">
-          <thead><tr><th>이름</th><th>⚽ 골</th><th>👟 도움</th><th>쿼터</th></tr></thead>
+          <thead><tr><th>이름</th><th>골</th><th>도움</th><th>쿼터</th></tr></thead>
           <tbody>${statsRows || '<tr><td colspan="4" class="empty-hint" style="text-align:center">데이터 없음</td></tr>'}</tbody>
           ${stats.length ? `<tfoot><tr class="stats-total"><td>합계</td><td class="num-cell">${totalG}</td><td class="num-cell">${totalA}</td><td></td></tr></tfoot>` : ''}
         </table>
@@ -189,7 +189,7 @@ function renderMatchDetail(match) {
 
       <div id="dt-formation" class="detail-tab-panel" style="display:none">
         ${formationSection}
-        ${subsRows ? `<ul class="subs-list"><li class="subs-list-title">교체 (In → Out)</li>${subsRows}</ul>` : ''}
+        ${subsRows ? `<ul class="subs-list"><li class="subs-list-title">${icon('swap', 'ic-sm')} 교체 (In → Out)</li>${subsRows}</ul>` : ''}
       </div>
 
       <div id="dt-squad" class="detail-tab-panel" style="display:none">

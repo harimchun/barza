@@ -392,7 +392,7 @@
     function reasonLabel(r) {
         if (!r) return '';
         switch (r.reason) {
-            case 'locked': return '🔒 고정';
+            case 'locked': return '고정';
             case 'exact': return r.rank === 0 ? '1순위' : `${r.rank + 1}순위`;
             case 'family': return `${r.rank + 1}순위 계열`;
             case 'line': return '같은 라인';

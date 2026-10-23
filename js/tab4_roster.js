@@ -40,7 +40,7 @@ function renderRosterTab() {
       }
       const pos = (p.positions || []).join(', ');
       const prio = p.priority || 2;
-      const prioBadge = prio !== 2 ? ` <span class="prio-badge prio-${prio}" title="우선순위 ${prio} (출전 가중치 ×${Quota.PRIORITY_WEIGHTS[prio]})">${prio === 1 ? '★ 1순위' : '3순위'}</span>` : '';
+      const prioBadge = prio !== 2 ? ` <span class="prio-badge prio-${prio}" title="우선순위 ${prio} (출전 가중치 ×${Quota.PRIORITY_WEIGHTS[prio]})">${prio === 1 ? icon('star', 'ic-sm') + ' 1순위' : '3순위'}</span>` : '';
       const meta = [
         p.fullName && p.fullName !== name ? escapeHtml(p.fullName) : '',
         p.jerseyNo != null ? `#${p.jerseyNo}` : '',
@@ -52,11 +52,11 @@ function renderRosterTab() {
       <td class="roster-pos">${pos ? escapeHtml(pos) : '<span class="empty-hint">-</span>'}</td>
       <td><span class="role-badge ${isGuestGroup ? 'guest' : 'member'}">${isGuestGroup ? '용병' : (p.active === false ? '비활동' : '멤버')}</span></td>
       <td class="roster-actions">
-        <button class="btn-sm editor-only" data-action="edit" data-name="${safe}">✏️</button>
+        <button class="btn-sm editor-only" data-action="edit" data-name="${safe}" title="편집">${icon('edit')}</button>
         ${isGuestGroup
           ? `<button class="btn-sm btn-promote editor-only" data-action="promote" data-name="${safe}">멤버로</button>`
           : `<button class="btn-sm btn-demote editor-only" data-action="demote" data-name="${safe}">용병으로</button>`}
-        <button class="btn-sm btn-delete-player editor-only" data-action="delete" data-name="${safe}" title="삭제">🗑️</button>
+        <button class="btn-sm btn-delete-player editor-only" data-action="delete" data-name="${safe}" title="삭제">${icon('trash')}</button>
       </td>
     </tr>`;
     }).join('');
@@ -70,7 +70,7 @@ function renderRosterTab() {
 
   container.innerHTML = `
     <div class="roster-add-card">
-      <h3>➕ 선수 / 용병 등록</h3>
+      <h3>${icon('plus')} 선수 / 용병 등록</h3>
       <div class="roster-add-form">
         <input type="text" id="new-player-name" class="editor-only" placeholder="이름 입력">
         <input type="text" id="new-player-positions" class="editor-only" placeholder="선호 포지션 (예: RB, GK)">
@@ -89,19 +89,19 @@ function renderRosterTab() {
 
     <div class="roster-stack">
       <div class="roster-section">
-        <h3>👕 정식 멤버 <span class="count-badge">${members.length}</span></h3>
+        <h3>${icon('shirt')} 정식 멤버 <span class="count-badge">${members.length}</span></h3>
         ${table(members, false)}
         ${inactive.length ? `<details style="margin-top:0.5rem"><summary class="hint-text">비활동 멤버 ${inactive.length}명</summary>${table(inactive, false)}</details>` : ''}
       </div>
       <details class="roster-section roster-guests" ${AppState.rosterGuestsOpen ? 'open' : ''}>
-        <summary><h3>🤝 용병 <span class="count-badge guest">${guests.length}</span> <small class="hint-text">최근 출전순 · 눌러서 펼치기</small></h3></summary>
+        <summary><h3>${icon('users')} 용병 <span class="count-badge guest">${guests.length}</span> <small class="hint-text">최근 출전순 · 눌러서 펼치기</small></h3></summary>
         <input type="search" id="roster-guest-filter" placeholder="용병 이름 검색" autocomplete="off" style="margin-bottom:0.5rem">
         <div id="roster-guest-table">${table(guests, true)}</div>
       </details>
     </div>
 
     <div class="roster-section" style="margin-top:1rem">
-      <h3>⚙️ 편집 권한 (구글 계정)</h3>
+      <h3>${icon('settings')} 편집 권한 (구글 계정)</h3>
       <p class="hint-text">아래 목록에 있는 구글 계정으로 로그인한 사람만 경기·명단을 수정할 수 있습니다. 멤버의 구글 이메일을 추가하거나, 멤버가 보낸 권한 요청을 승인하세요.</p>
       ${buildEditorsSection()}
     </div>`;
@@ -173,7 +173,7 @@ async function addPlayer() {
 async function setPlayerRole(name, role) {
   if (!checkEditorAccess()) return;
   AppState.roster[name].role = role;
-  await persistPlayer(name, role === 'member' ? `${name}님을 정식 멤버로 승격했습니다! 🎉` : `${name}님을 용병으로 변경했습니다.`);
+  await persistPlayer(name, role === 'member' ? `${name}님을 정식 멤버로 승격했습니다!` : `${name}님을 용병으로 변경했습니다.`);
 }
 
 async function savePlayerEdit(name, form) {
@@ -228,7 +228,7 @@ function buildEditorsSection() {
     ? editors.map(([key, e]) => `
         <li class="editor-item">
           <span class="editor-mail">${escapeHtml(e.email)}${e.email === me ? ' <small>(나)</small>' : ''}${e.name ? ` <small>${escapeHtml(e.name)}</small>` : ''}</span>
-          <button class="btn-sm btn-delete-player editor-only" data-action="remove-editor" data-key="${escapeHtml(key)}" title="편집 권한 제거" ${editors.length === 1 ? 'disabled' : ''}>✕</button>
+          <button class="btn-sm btn-delete-player editor-only" data-action="remove-editor" data-key="${escapeHtml(key)}" title="편집 권한 제거" ${editors.length === 1 ? 'disabled' : ''}>${icon('close')}</button>
         </li>`).join('')
     : '<li class="empty-hint">아직 편집자가 없습니다. 처음 로그인하는 계정이 자동으로 편집자가 됩니다.</li>';
   const requestRows = requests.length
