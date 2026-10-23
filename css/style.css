@@ -2392,3 +2392,48 @@ input[type="checkbox"] {
     grid-template-columns: 1fr 20px 1fr;
   }
 }
+/* ═══════════════════════════════════════════════════════════
+   v2 데이터 모델 추가 스타일 (참석 그룹 · 교체 0.5 · 명단 편집)
+   ═══════════════════════════════════════════════════════════ */
+.check-group { margin-bottom: 0.6rem; }
+.check-group-title {
+  font-size: 0.78rem; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.02em; margin: 0.35rem 0; cursor: default;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+details.check-group > summary.check-group-title { cursor: pointer; list-style: none; }
+details.check-group > summary.check-group-title::before { content: '▸'; font-size: 0.7rem; }
+details.check-group[open] > summary.check-group-title::before { content: '▾'; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.15rem 0.5rem; }
+.player-check-item .pos-hint { color: var(--text-muted); font-size: 0.68rem; margin-left: 0.25rem; }
+.player-check-item em { color: var(--text-muted); font-size: 0.65rem; font-style: normal; margin-left: 0.3rem; }
+#guest-filter, #roster-guest-filter { width: 100%; margin: 0.3rem 0 0.4rem; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+
+.participation-score.under { color: var(--blue); }
+.participation-score.over { color: var(--red); }
+.extra-subs { margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-muted); }
+.extra-sub { display: inline-flex; align-items: center; gap: 0.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.5rem; }
+.extra-sub-del { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0 0.1rem; font-size: 0.75rem; }
+
+.manual-score { margin-top: 0.75rem; border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; }
+.manual-score > summary { cursor: pointer; font-size: 0.82rem; color: var(--text-muted); }
+.manual-score-grid { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin: 0.6rem 0; }
+.manual-score-grid label { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; }
+.manual-score-grid input { width: 3.2rem; padding: 0.25rem 0.3rem; text-align: center; }
+.manual-stats-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.manual-stats-table th, .manual-stats-table td { padding: 0.2rem 0.4rem; border-bottom: 1px solid var(--border); }
+.manual-stats-table input { width: 3.2rem; padding: 0.2rem 0.3rem; text-align: center; }
+
+.subs-list { list-style: none; padding: 0.5rem 0 0; margin: 0.5rem 0 0; font-size: 0.82rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.subs-list-title { color: var(--text-muted); font-size: 0.75rem; font-weight: 700; }
+.subs-list .sub-arrow { color: var(--gold); }
+.subs-list small { color: var(--text-muted); }
+
+.roster-meta { font-size: 0.7rem; color: var(--text-muted); font-weight: 400; margin-top: 0.1rem; }
+.roster-pos { font-size: 0.8rem; color: var(--text-muted); }
+.roster-edit-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.5rem; padding: 0.5rem 0; }
+.roster-edit-form label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.72rem; color: var(--text-muted); }
+.roster-edit-form label.re-check { flex-direction: row; align-items: center; align-self: end; gap: 0.4rem; font-size: 0.8rem; color: var(--text); }
+.roster-edit-form input[type="text"], .roster-edit-form input[type="number"] { padding: 0.35rem 0.5rem; font-size: 0.85rem; }
+.roster-edit-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; }
+.roster-add-form #new-player-positions { flex: 1; min-width: 140px; }

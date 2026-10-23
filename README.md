@@ -51,6 +51,22 @@ FIREBASE_DB_URL: 'https://fc-barza-xxxxx-default-rtdb.firebaseio.com',
 
 ---
 
+## 데이터 구조 / 스프레드시트 이관
+
+- DB 구조(v2)는 [docs/data-schema.md](docs/data-schema.md) 참고. 경기는 `/matches/{날짜}`, 선수는 `/roster/{이름}` 단위로 저장됩니다.
+- 기존 팀 스프레드시트(경기 시트 + 대시보드)를 한 번에 가져오려면:
+
+```bash
+# 1) 구글 시트를 xlsx로 내려받기 (파일 > 다운로드 > Microsoft Excel)
+# 2) 결과 미리보기 (data/import/ 에 JSON + report.md 생성)
+python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import
+# 3) 앱에서 확인: python3 -m http.server 8765 → http://localhost:8765/index.html?local=1
+# 4) 문제 없으면 업로드 (기존 DB는 data/import/backup-*.json 으로 백업)
+python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import --upload --backup
+```
+
+> `scipy`, `numpy` 필요 (`pip install scipy numpy`). `report.md` 에 대시보드 대조 결과·별칭 해석·포메이션 추정 내역이 정리됩니다.
+
 ## 앱 실행
 
 ```bash
@@ -91,7 +107,7 @@ python3 -m http.server 8080
 
 | 탭 | 기능 |
 |---|---|
-| 📋 당일 경기 운영 | 참석자 선택, 포메이션 배치(4종), 출전시간 균형, 실시간 골/스코어 기록·수정, 임시/확정 저장 |
-| 📈 시즌 스탯 | 골/도움/출석 리더보드, CSV 업로드·다운로드 |
-| 📚 기록 조회 & 수정 | 경기 목록, 포메이션 이미지, 수정, 삭제 |
-| 👥 선수단 관리 | 멤버 추가·삭제, 용병↔멤버 전환 |
+| 📋 당일 경기 운영 | 참석자 선택, 포메이션 배치(4종), 교체(In/Out) 기록, 쿼터 참여(교체 0.5)·목표 쿼터 자동 계산, 실시간 골/스코어 기록, 임시/확정 저장 |
+| 📈 시즌 스탯 | 승/무/패, 쿼터별 득실, 골/도움/공격포인트/출석·총 쿼터 리더보드, CSV 다운로드 |
+| 📚 기록 조회 & 수정 | 경기 목록, 포메이션 이미지(4·5쿼터), 교체 내역, 명단·쿼터, 수정, 삭제 |
+| 👥 선수단 관리 | 멤버/용병 등록, 본명·선호 포지션·등번호·별칭 편집, 활동 여부 |

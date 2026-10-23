@@ -160,19 +160,20 @@ function exportCombinedFormation() {
 }
 
 /**
- * 4개 쿼터 포메이션을 이미지 src로 반환 (기록 조회 탭용)
+ * 쿼터별 포메이션을 2열 그리드 이미지 src로 반환 (기록 조회 탭용, 4쿼터/5쿼터)
  */
-function buildCombinedFormationImage(formationPlan, formationSubs, formationTypes, formationCoords) {
+function buildCombinedFormationImage(formationPlan, formationSubs, formationTypes, formationCoords, quarters) {
+    const qs = (quarters && quarters.length) ? quarters : QUARTERS;
     const qW = 600, qH = 400;
     const canvas = document.createElement('canvas');
     canvas.width = qW * 2;
-    canvas.height = qH * 2;
+    canvas.height = qH * Math.ceil(qs.length / 2);
     const ctx = canvas.getContext('2d');
 
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    QUARTERS.forEach((q, i) => {
+    qs.forEach((q, i) => {
         const col = i % 2;
         const row = Math.floor(i / 2);
         drawQuarterFormation(

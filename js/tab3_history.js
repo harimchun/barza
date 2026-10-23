@@ -6,7 +6,7 @@ function renderHistoryTab() {
   const container = document.getElementById('tab3-content');
   if (!container) return;
 
-  const history = [...AppState.matches].reverse();
+  const history = [...AppState.matches].sort((a, b) => String(b.id).localeCompare(String(a.id)));
 
   if (history.length === 0) {
     container.innerHTML = '<div class="empty-state"><p>📭 저장된 경기 기록이 없습니다.</p></div>';
@@ -14,11 +14,12 @@ function renderHistoryTab() {
   }
 
   const optionsHtml = history.map((m, i) => {
-    const icon = m.is_draft ? '📝' : '✅';
-    return `<option value="${i}">${icon} ${escapeHtml(m.date)} — ${escapeHtml(m.location)} vs ${escapeHtml(m.opponent)}</option>`;
+    const icon = m.status === 'draft' ? '📝' : (m.type === 'intra' ? '🔁' : '✅');
+    return `<option value="${i}">${icon} ${escapeHtml(m.date)} — ${escapeHtml(m.venue)} vs ${escapeHtml(m.opponent)}</option>`;
   }).join('');
 
   container.innerHTML = `
+    ${AppState.legacyMatches ? '<div class="role-notice-banner">⚠️ DB가 구버전 형식입니다. 스프레드시트 이관(tools/import_sheet.py --upload)을 실행하면 전체 기록이 표시됩니다.</div>' : ''}
     <div class="history-selector-row">
       <select id="history-match-select" class="history-select">
         ${optionsHtml}
@@ -31,9 +32,9 @@ function renderHistoryTab() {
   renderMatchDetail(history[0]);
 }
 
-// match_events → 좌(바르자)/우(상대) 타임라인 HTML
-function buildTimelineHtml(events, scores) {
-  const blocks = QUARTERS.map(q => {
+// events → 좌(바르자)/우(상대) 타임라인 HTML
+function buildTimelineHtml(events, scores, quarters) {
+  const blocks = quarters.map(q => {
     const evs = events.filter(e => e && e.quarter === q);
     if (evs.length === 0) return '';
     const [u, t] = scores[q] || [0, 0];
@@ -57,17 +58,16 @@ function renderMatchDetail(match) {
   const container = document.getElementById('history-match-detail');
   if (!container || !match) return;
 
-  const isDraft = match.is_draft;
+  const isDraft = match.status === 'draft';
+  const quarters = recordQuarters(match);
   const scores = match.scores || {};
-  const totUs = QUARTERS.reduce((s, q) => s + (scores[q]?.[0] || 0), 0);
-  const totThem = QUARTERS.reduce((s, q) => s + (scores[q]?.[1] || 0), 0);
+  const totUs = quarters.reduce((s, q) => s + ((scores[q] || [0, 0])[0]), 0);
+  const totThem = quarters.reduce((s, q) => s + ((scores[q] || [0, 0])[1]), 0);
 
-  // 승/무/패
   const resultKey = totUs > totThem ? 'win' : totUs < totThem ? 'loss' : 'draw';
-  const resultLabel = { win: '승리', loss: '패배', draw: '무승부' }[resultKey];
+  const resultLabel = match.scoresKnown === false ? '스코어 미기록' : { win: '승리', loss: '패배', draw: '무승부' }[resultKey];
 
-  // 쿼터 스코어 칩
-  const quarterChips = QUARTERS.map(q => {
+  const quarterChips = quarters.map(q => {
     const [u, t] = scores[q] || [0, 0];
     const cls = u > t ? 'q-win' : u < t ? 'q-loss' : 'q-draw';
     return `<div class="hero-q-chip ${cls}">
@@ -76,15 +76,18 @@ function renderMatchDetail(match) {
     </div>`;
   }).join('');
 
-  // 타임라인 (실시간 기록 이벤트 기반 — 구버전 기록엔 없을 수 있음)
-  const events = Array.isArray(match.match_events) ? match.match_events : [];
+  const events = Array.isArray(match.events) ? match.events : [];
   const hasTimeline = events.length > 0;
 
-  // 스탯: 공격포인트 순 정렬 + 합계, 최고 기록자 하이라이트
-  const stats = (match.match_stats || []).map(r => ({
-    name: r['이름'], g: r['골'] || 0, a: r['어시스트'] || 0,
+  // 스탯: 공격포인트 순 정렬 + 합계
+  const credits = recordParticipation(match);
+  const names = new Set([...(match.attendees || []), ...Object.keys(credits), ...Object.keys(match.stats || {})]);
+  const stats = [...names].map(n => ({
+    name: n, g: (match.stats && match.stats[n] && match.stats[n].goals) || 0,
+    a: (match.stats && match.stats[n] && match.stats[n].assists) || 0,
+    q: credits[n] || 0,
   }));
-  stats.sort((x, y) => (y.g - x.g) || (y.a - x.a) || String(x.name).localeCompare(String(y.name), 'ko'));
+  stats.sort((x, y) => (y.g - x.g) || (y.a - x.a) || (y.q - x.q) || String(x.name).localeCompare(String(y.name), 'ko'));
   const totalG = stats.reduce((s, r) => s + r.g, 0);
   const totalA = stats.reduce((s, r) => s + r.a, 0);
   const maxPts = stats.reduce((m, r) => Math.max(m, r.g + r.a), 0);
@@ -95,20 +98,48 @@ function renderMatchDetail(match) {
       <td>${cls === 'stat-top' ? '⭐ ' : ''}${escapeHtml(r.name)}</td>
       <td class="num-cell">${r.g || ''}</td>
       <td class="num-cell">${r.a || ''}</td>
+      <td class="num-cell">${r.q ? fmtQ(r.q) : ''}</td>
     </tr>`;
   }).join('');
 
-  const squadRows = (match.squad_plan || []).map(row => {
-    const qCells = QUARTERS.map(q => `<td class="${row[q] ? 'check-yes' : 'check-no'}">${row[q] ? '✓' : ''}</td>`).join('');
-    return `<tr><td>${escapeHtml(row['이름'])}</td>${qCells}</tr>`;
+  // 명단: 쿼터별 ● 주전 / ◐ 교체 관여 + 실 참여 합계
+  const played = [...names].filter(n => credits[n] > 0).sort((a, b) => (credits[b] - credits[a]) || a.localeCompare(b, 'ko'));
+  const benchOnly = [...names].filter(n => !(credits[n] > 0));
+  const squadRows = played.map(n => {
+    const qCells = quarters.map(q => {
+      const qd = (match.quarters || {})[q] || {};
+      const c = quarterCredit(qd.lineup, qd.subs, n);
+      const mark = c >= 1 ? '●' : c > 0 ? '◐' : '';
+      return `<td class="${c > 0 ? 'check-yes' : 'check-no'}">${mark}</td>`;
+    }).join('');
+    return `<tr><td>${escapeHtml(formatPlayerName(n))}</td>${qCells}<td class="num-cell">${fmtQ(credits[n])}</td></tr>`;
   }).join('');
+  const subsRows = quarters.map(q => {
+    const subs = (((match.quarters || {})[q] || {}).subs || []);
+    if (!subs.length) return '';
+    return `<li><strong>${q}</strong> ${subs.map(s => `${escapeHtml(s.in || '?')} <span class="sub-arrow">→</span> ${escapeHtml(s.out || '?')}${s.pos ? ` <small>(${escapeHtml(s.pos)})</small>` : ''}`).join(' · ')}</li>`;
+  }).join('');
+  const playedCount = played.length;
+  const target = playedCount ? (11 * quarters.length) / (match.attendees || []).length : 0;
+  const avg = playedCount ? played.reduce((s, n) => s + credits[n], 0) / playedCount : 0;
 
-  // 포메이션 이미지 생성
-  const hasFormation = match.formation_plan && Object.values(match.formation_plan).some(f => Object.keys(f).length > 0);
+  // 포메이션 이미지
+  const plan = {}, subsMap = {}, types = {}, coords = {};
+  quarters.forEach(q => {
+    const qd = (match.quarters || {})[q] || {};
+    plan[q] = qd.lineup || {};
+    types[q] = qd.formation || '?';
+    coords[q] = qd.coords || {};
+    subsMap[q] = {};
+    (qd.subs || []).forEach(s => { if (s.pos && s.in) subsMap[q][s.pos] = s.in; });
+  });
+  const hasFormation = Object.values(plan).some(f => Object.keys(f).length > 0);
   const formationSection = hasFormation
-    ? `<img class="formation-image" src="${buildCombinedFormationImage(
-      match.formation_plan, match.formation_subs, match.formation_types, match.formation_coords)}" alt="포메이션">`
+    ? `<img class="formation-image" src="${buildCombinedFormationImage(plan, subsMap, types, coords, quarters)}" alt="포메이션">`
     : '<p class="empty-hint">저장된 포메이션 데이터가 없습니다.</p>';
+
+  const sourceTag = match.source && match.source.kind === 'sheet' ? ' · 📄 스프레드시트' : '';
+  const metaExtra = [match.timeSlot, match.notes].filter(Boolean).map(escapeHtml).join(' · ');
 
   container.innerHTML = `
     <div class="match-hero">
@@ -116,6 +147,7 @@ function renderMatchDetail(match) {
         <div class="hero-badges">
           <span class="status-badge ${isDraft ? 'draft' : 'final'}">${isDraft ? '📝 임시' : '✅ 확정'}</span>
           <span class="hero-result-chip ${resultKey}">${resultLabel}</span>
+          ${match.type === 'intra' ? '<span class="status-badge draft">🔁 자체전 (통계 제외)</span>' : ''}
         </div>
         <div class="match-actions">
           <button class="btn-hero-action editor-only" data-action="edit-match">✏️ 수정</button>
@@ -129,7 +161,7 @@ function renderMatchDetail(match) {
         <div class="hero-team">${escapeHtml(match.opponent || '상대팀')}</div>
       </div>
 
-      <div class="hero-meta">📅 ${escapeHtml(match.date)} &nbsp;·&nbsp; 📍 ${escapeHtml(match.location)}</div>
+      <div class="hero-meta">📅 ${escapeHtml(match.date)} &nbsp;·&nbsp; 📍 ${escapeHtml(match.venue)}${metaExtra ? ' &nbsp;·&nbsp; ' + metaExtra : ''}${sourceTag}</div>
       <div class="hero-quarters">${quarterChips}</div>
     </div>
 
@@ -138,28 +170,37 @@ function renderMatchDetail(match) {
         ${hasTimeline ? '<button class="detail-tab-btn active" data-dtab="dt-timeline">⏱️ 타임라인</button>' : ''}
         <button class="detail-tab-btn ${hasTimeline ? '' : 'active'}" data-dtab="dt-stats">📊 스탯</button>
         <button class="detail-tab-btn" data-dtab="dt-formation">🏟️ 포메이션</button>
-        <button class="detail-tab-btn" data-dtab="dt-squad">📋 명단</button>
+        <button class="detail-tab-btn" data-dtab="dt-squad">📋 명단·쿼터</button>
       </div>
 
-      ${hasTimeline ? `<div id="dt-timeline" class="detail-tab-panel">${buildTimelineHtml(events, scores)}</div>` : ''}
+      ${hasTimeline ? `<div id="dt-timeline" class="detail-tab-panel">${buildTimelineHtml(events, scores, quarters)}</div>` : ''}
 
       <div id="dt-stats" class="detail-tab-panel" ${hasTimeline ? 'style="display:none"' : ''}>
         <table class="stats-table">
-          <thead><tr><th>이름</th><th>⚽ 골</th><th>👟 도움</th></tr></thead>
-          <tbody>${statsRows || '<tr><td colspan="3" class="empty-hint" style="text-align:center">데이터 없음</td></tr>'}</tbody>
-          ${stats.length ? `<tfoot><tr class="stats-total"><td>합계</td><td class="num-cell">${totalG}</td><td class="num-cell">${totalA}</td></tr></tfoot>` : ''}
+          <thead><tr><th>이름</th><th>⚽ 골</th><th>👟 도움</th><th>쿼터</th></tr></thead>
+          <tbody>${statsRows || '<tr><td colspan="4" class="empty-hint" style="text-align:center">데이터 없음</td></tr>'}</tbody>
+          ${stats.length ? `<tfoot><tr class="stats-total"><td>합계</td><td class="num-cell">${totalG}</td><td class="num-cell">${totalA}</td><td></td></tr></tfoot>` : ''}
         </table>
       </div>
 
       <div id="dt-formation" class="detail-tab-panel" style="display:none">
         ${formationSection}
+        ${subsRows ? `<ul class="subs-list"><li class="subs-list-title">교체 (In → Out)</li>${subsRows}</ul>` : ''}
       </div>
 
       <div id="dt-squad" class="detail-tab-panel" style="display:none">
+        <div class="playtime-info" style="margin-bottom:0.5rem">
+          <span>참석 <strong>${(match.attendees || []).length}명</strong></span>
+          <span>출전 <strong>${playedCount}명</strong></span>
+          <span>목표 <strong>${target.toFixed(2)}Q</strong></span>
+          <span>실제 평균 <strong>${avg.toFixed(2)}Q</strong></span>
+        </div>
         <table class="squad-table">
-          <thead><tr><th>이름</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th></tr></thead>
-          <tbody>${squadRows || '<tr><td colspan="5" class="empty-hint" style="text-align:center">데이터 없음</td></tr>'}</tbody>
+          <thead><tr><th>이름</th>${quarters.map(q => `<th>${q}</th>`).join('')}<th>참여</th></tr></thead>
+          <tbody>${squadRows || '<tr><td colspan="6" class="empty-hint" style="text-align:center">데이터 없음</td></tr>'}</tbody>
         </table>
+        ${benchOnly.length ? `<p class="hint-text" style="margin-top:0.5rem">출전 없음: ${benchOnly.map(escapeHtml).join(', ')}</p>` : ''}
+        <p class="hint-text">● 주전 1쿼터 · ◐ 교체 In/Out 0.5쿼터</p>
       </div>
     </div>
 
@@ -171,7 +212,6 @@ function renderMatchDetail(match) {
       </div>
     </div>`;
 
-  // ── 이벤트 바인딩 (인라인 onclick 대신 — 특수문자 안전) ──
   const editBtn = container.querySelector('[data-action="edit-match"]');
   if (editBtn) editBtn.addEventListener('click', () => {
     const fresh = AppState.matches.find(m => m.id === match.id);
@@ -191,7 +231,6 @@ function renderMatchDetail(match) {
     if (box) box.style.display = 'none';
   });
 
-  // 새로 그려진 편집 버튼에 권한 상태 반영
   if (typeof updateEditButtonsVisibility === 'function') updateEditButtonsVisibility();
 }
 
@@ -210,18 +249,17 @@ function confirmDeleteMatch(matchId, matchTitle) {
   const yesBtn = document.getElementById('delete-confirm-yes');
   if (!box) return;
   text.innerHTML = `정말 <strong>${escapeHtml(matchTitle)}</strong> 기록을 삭제하시겠습니까?`;
-  yesBtn.onclick = async () => {
-    await deleteMatch(matchId);
-  };
+  yesBtn.onclick = async () => { await deleteMatch(matchId); };
   box.style.display = 'block';
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function deleteMatch(matchId) {
   if (!checkEditorAccess()) return;
-  AppState.matches = AppState.matches.filter(m => m.id !== matchId);
+  if (AppState.legacyMatches) { showToast('DB 이관 전에는 삭제할 수 없습니다.', 'error'); return; }
   try {
-    await saveMatches();
+    await deleteMatchRecord(matchId);
+    if (AppState.editModeId === matchId) AppState.editModeId = null;
     showToast('기록이 삭제되었습니다.', 'success');
     renderHistoryTab();
   } catch (e) {

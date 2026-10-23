@@ -47,7 +47,7 @@ const POSITION_DISPLAY_LABELS = {
     '3-5-2': { 'MF0': 'MF', 'MF1': 'MF', 'MF2': 'MF' },
 };
 
-// Canvas용 포지션 좌표 (100x70 pitch 기준, GK=left, ST=right)
+// Canvas용 포지션 좌표 (100x70 pitch 기준, GK=left, ST=right) — 좌표 정보가 없는 옛 기록용 폴백
 const POS_COORDS = {
     'GK': [5, 35],
     'LB': [20, 60], 'LCB': [15, 42], 'RCB': [15, 28], 'RB': [20, 10],
@@ -60,6 +60,8 @@ const POS_COORDS = {
     'MF0': [40, 50], 'MF1': [35, 35], 'MF2': [40, 20],
 };
 
+const DEFAULT_VENUES = ['잠실유수지', '탄천유수지', '송파여성축구장', '천마축구장'];
+
 // 앱 전역 상태
 const AppState = {
     // 편집 권한 (공유 암호 기반)
@@ -67,27 +69,26 @@ const AppState = {
     isEditor: false,            // true면 편집 모드 (암호로 잠금 해제됨)
     editPasscodeHash: null,     // DB에 저장된 편집 암호 해시 (없으면 null = 미설정)
 
-    // Drive 파일 ID 캐시
-    rosterFileId: null,
-    matchesFileId: null,
-
     // 데이터
-    roster: {},    // { name: "Member" | "Guest" }
-    matches: [],   // 경기 기록 배열
+    roster: {},    // { name: { name, fullName, role, positions, jerseyNo, aliases, active } }
+    matches: [],   // 경기 레코드 배열 (v2, id 오름차순)
+    venues: [],    // 경기장 목록
+    legacyMatches: false, // DB가 아직 v1 배열 형식이면 true (이관 전)
 
     // Tab 1 - 현재 경기 편집 상태
     matchDate: today(),
     matchLocation: '잠실유수지',
     matchOpponent: '상대팀',
     attendees: [],   // string[]
-    squadPlan: {},   // { name: { '1Q': bool, '2Q': bool, '3Q': bool, '4Q': bool } }
     formationTypes: { '1Q': '4-2-3-1', '2Q': '4-2-3-1', '3Q': '4-2-3-1', '4Q': '4-2-3-1' },
     formationState: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: name } }
-    formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: name } }
+    formationSubs: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: inName } } — out 선수는 formationState[q][pos]
     formationCoords: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: {left,top}% } } 카드 자유 배치 오버라이드
+    extraSubs: { '1Q': [], '2Q': [], '3Q': [], '4Q': [] },      // 포지션을 특정할 수 없는 교체 쌍 [{in,out}] (시트 이관분)
     quarterScores: { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] },
     matchStats: {},  // { name: { goals: 0, assists: 0 } }
     matchEvents: [], // [{ quarter, type:'goal'|'opponentGoal', scorer, assister }]
+    editingExtras: null, // 수정 중인 레코드의 편집하지 않는 필드 (type, timeSlot, notes, source, 5Q 이상 쿼터 등)
     liveQuarter: '1Q',
     editingEventIdx: null, // 실시간 기록에서 인라인 수정 중인 이벤트 인덱스
     editModeId: null,
@@ -120,49 +121,108 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+// ── 선수 헬퍼 ──────────────────────────────────────────────────────────────
+function getPlayer(name) {
+    return AppState.roster[name] || null;
+}
+
+function isGuest(name) {
+    const p = getPlayer(name);
+    return p ? p.role === 'guest' : false;
+}
+
 function formatPlayerName(name) {
-    const role = AppState.roster[name];
-    return role === 'Guest' ? `${name} (용병)` : name;
+    return isGuest(name) ? `${name} (용병)` : name;
 }
 
 function getAllPlayersSorted() {
     return Object.keys(AppState.roster).sort((a, b) => a.localeCompare(b, 'ko'));
 }
 
+// 명단 그룹: 활동 멤버 / 비활동 멤버 / 용병 (용병은 최근 출전순)
+function getRosterGroups() {
+    const names = getAllPlayersSorted();
+    const lastSeen = {};
+    AppState.matches.forEach(m => (m.attendees || []).forEach(n => {
+        if (!lastSeen[n] || lastSeen[n] < m.date) lastSeen[n] = m.date;
+    }));
+    const members = names.filter(n => !isGuest(n) && getPlayer(n).active !== false);
+    const inactive = names.filter(n => !isGuest(n) && getPlayer(n).active === false);
+    const guests = names.filter(n => isGuest(n))
+        .sort((a, b) => (lastSeen[b] || '').localeCompare(lastSeen[a] || '') || a.localeCompare(b, 'ko'));
+    return { members, inactive, guests, lastSeen };
+}
+
+// ── 쿼터 참여 계산 (시트 규칙) ─────────────────────────────────────────────
+// 한 쿼터에 보드에 있으면 1, 교체 In/Out에 등장할 때마다 0.5 차감 (최소 0)
+function quarterCredit(lineup, subs, name) {
+    const onBoard = Object.values(lineup || {}).includes(name);
+    let subCount = 0;
+    (subs || []).forEach(s => {
+        if (s.in === name) subCount++;
+        if (s.out === name) subCount++;
+    });
+    if (!onBoard && subCount === 0) return 0;
+    return Math.max(0, 1 - 0.5 * subCount);
+}
+
+// 편집 중인 경기 상태에서 쿼터별 교체 쌍 목록 생성
+function editorSubsForQuarter(q) {
+    const lineup = AppState.formationState[q] || {};
+    const subs = [];
+    for (const [pos, inName] of Object.entries(AppState.formationSubs[q] || {})) {
+        if (!inName || inName === '-') continue;
+        subs.push({ in: inName, out: lineup[pos] || null, pos });
+    }
+    (AppState.extraSubs[q] || []).forEach(s => subs.push({ in: s.in || null, out: s.out || null, pos: null }));
+    return subs;
+}
+
 function getParticipation(playerName) {
     let total = 0;
     QUARTERS.forEach(q => {
-        const inSquad = AppState.squadPlan[playerName]?.[q] || false;
-        if (!inSquad) return;
-        // 교체 여부 확인
-        let isSub = false;
-        const fMap = AppState.formationState[q];
-        const fSubs = AppState.formationSubs[q];
-        for (const pos in fMap) {
-            if (fSubs[pos] && fSubs[pos] !== '-' &&
-                (fMap[pos] === playerName || fSubs[pos] === playerName)) {
-                isSub = true;
-                break;
-            }
-        }
-        total += isSub ? 0.5 : 1;
+        total += quarterCredit(AppState.formationState[q], editorSubsForQuarter(q), playerName);
     });
     return total;
 }
 
+// 저장된 레코드의 쿼터 목록 (4쿼터/5쿼터)
+function recordQuarters(record) {
+    const keys = Object.keys((record && record.quarters) || {});
+    const all = keys.length ? keys : QUARTERS;
+    return all.sort((a, b) => parseInt(a) - parseInt(b));
+}
+
+// 저장된 레코드에서 선수별 실 참여 쿼터
+function recordParticipation(record) {
+    const credits = {};
+    recordQuarters(record).forEach(q => {
+        const qd = (record.quarters && record.quarters[q]) || {};
+        const names = new Set(Object.values(qd.lineup || {}));
+        (qd.subs || []).forEach(s => { if (s.in) names.add(s.in); if (s.out) names.add(s.out); });
+        names.forEach(n => { credits[n] = (credits[n] || 0) + quarterCredit(qd.lineup, qd.subs, n); });
+    });
+    return credits;
+}
+
+function fmtQ(n) {
+    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 function resetMatchState() {
     AppState.matchDate = today();
-    AppState.matchLocation = '잠실유수지';
+    AppState.matchLocation = AppState.venues[0] || '잠실유수지';
     AppState.matchOpponent = '상대팀';
     AppState.attendees = [];
-    AppState.squadPlan = {};
     AppState.formationTypes = { '1Q': '4-2-3-1', '2Q': '4-2-3-1', '3Q': '4-2-3-1', '4Q': '4-2-3-1' };
     AppState.formationState = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
     AppState.formationSubs = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
     AppState.formationCoords = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
+    AppState.extraSubs = { '1Q': [], '2Q': [], '3Q': [], '4Q': [] };
     AppState.quarterScores = { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
     AppState.matchStats = {};
     AppState.matchEvents = [];
+    AppState.editingExtras = null;
     AppState.liveQuarter = '1Q';
     AppState.editingEventIdx = null;
     AppState.editModeId = null;
@@ -192,53 +252,42 @@ function switchTab(tabId) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
-    // 탭 진입 시 렌더링
     if (tabId === 'tab2') renderStatsTab();
     if (tabId === 'tab3') renderHistoryTab();
     if (tabId === 'tab4') renderRosterTab();
 }
 
-// 업장 비교 (4개 기본 + localStorage 커스텀)
-const DEFAULT_VENUES = ['\uc7a0\uc2e4\uc720\uc218\uc9c0', '\ud0c4\ucc9c\uc720\uc218\uc9c0', '\uc1a1\ud30c\uc5ec\uc131\ucd95\uad6c\uc7a5', '\ucc9c\ub9c8\ucd95\uad6c\uc7a5'];
-
-function getCustomVenues() {
-    try { return JSON.parse(localStorage.getItem('fc_barza_venues') || '[]'); }
-    catch { return []; }
-}
-
-function saveCustomVenue(name) {
-    const list = getCustomVenues();
-    if (!list.includes(name) && !DEFAULT_VENUES.includes(name)) {
-        list.push(name);
-        localStorage.setItem('fc_barza_venues', JSON.stringify(list));
+// ── 경기장 목록 (DB /settings/venues) ─────────────────────────────────────
+async function addVenue(name) {
+    if (!name) return;
+    if (!AppState.venues.includes(name)) {
+        AppState.venues.push(name);
+        try { await saveVenues(); }
+        catch (e) { showToast('경기장 저장 실패: ' + e.message, 'error'); }
     }
 }
 
 function populateVenueSelect(selected) {
     const sel = document.getElementById('match-location');
     if (!sel) return;
-    const custom = getCustomVenues();
-    const all = [...DEFAULT_VENUES, ...custom];
-    // 기존 옵션 유지 (추가 전)
-    sel.innerHTML = all.map(v =>
-        `<option value="${v}"${v === (selected || AppState.matchLocation) ? ' selected' : ''}>${v}</option>`
-    ).join('') + '<option value="__custom__">+ \ub2e4\ub978 \uacbd\uae30\uc7a5 \ucd94\uac00...</option>';
+    const cur = selected || AppState.matchLocation;
+    const list = [...AppState.venues];
+    if (cur && !list.includes(cur)) list.push(cur);
+    sel.innerHTML = list.map(v =>
+        `<option value="${escapeHtml(v)}"${v === cur ? ' selected' : ''}>${escapeHtml(v)}</option>`
+    ).join('') + '<option value="__custom__">+ 다른 경기장 추가...</option>';
 }
 
 // 앱 초기화
 async function initApp() {
-    // 탭 버튼 이벤트
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
 
-    // Tab 1 이벤트 초기화
     initTab1Events();
-
-    // 업장 드롭다운 초기 보지
+    AppState.venues = [...DEFAULT_VENUES];
     populateVenueSelect();
 
-    // Flatpickr 운영 (Korean locale)
     if (typeof flatpickr !== 'undefined') {
         flatpickr('#match-date', {
             locale: 'ko',
@@ -253,8 +302,8 @@ async function initApp() {
         document.getElementById('match-date').value = today();
     }
 
-    // 백엔드(데이터 + 편집 암호) 초기화
     await initBackend();
+    populateVenueSelect();
 }
 
 document.addEventListener('DOMContentLoaded', initApp);

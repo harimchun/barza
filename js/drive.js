@@ -1,16 +1,32 @@
 // =============================================
-// FC 바르자 팀 매니저 - Firebase / Auth 연동
+// FC 바르자 팀 매니저 - Firebase / Auth 연동 (스키마 v2)
 // =============================================
+//
+// DB 구조 (v2):
+//   /roster/{name}            { name, fullName, role:'member'|'guest', positions:[], jerseyNo, aliases:[], active }
+//   /matches/{matchId}        경기 레코드 (docs/data-schema.md 참고)
+//   /settings/venues          ["잠실유수지", ...]
+//   /settings/edit_passcode   편집 암호 해시
+//   /settings/schemaVersion   2
+//
+// 쓰기는 항상 레코드 단위(/matches/{id}, /roster/{name})로 하여 동시 편집 시 다른 레코드를 덮어쓰지 않는다.
 
 const DB_NODES = {
     roster: '/roster.json',
     matches: '/matches.json',
+    venues: '/settings/venues.json',
     passcode: '/settings/edit_passcode.json',
+    schemaVersion: '/settings/schemaVersion.json',
 };
 
 function dbUrl(node, token) {
     const base = CONFIG.FIREBASE_DB_URL.replace(/\/$/, '') + node;
     return token ? `${base}?auth=${encodeURIComponent(token)}` : base;
+}
+
+// Firebase 키에 쓸 수 없는 문자(. $ # [ ] /) 제거
+function dbKey(s) {
+    return String(s).replace(/[.$#[\]/]/g, '_');
 }
 
 // 현재 익명 사용자(또는 없음)의 ID 토큰 — 쓰기 요청에 첨부
@@ -209,19 +225,39 @@ function checkEditorAccess() {
     return false;
 }
 
-// ── Firebase REST API (읽기/쓰기 모두 인증 불필요 — 규칙이 공개) ────────────
+// ── 로컬 데이터 모드 (?local=1): data/import/*.json 을 DB 대신 읽고, 쓰기는 콘솔에만 기록 ──
+// 이관 결과를 업로드 전에 앱에서 미리 확인하는 용도 (python3 -m http.server 로 띄운 뒤 index.html?local=1)
+const LOCAL_DATA_MODE = new URLSearchParams(location.search).get('local') === '1';
+const LOCAL_DATA_FILES = {
+    [DB_NODES.roster]: 'data/import/roster.json',
+    [DB_NODES.matches]: 'data/import/matches.json',
+    [DB_NODES.venues]: 'data/import/venues.json',
+};
+
+// ── Firebase REST API ──────────────────────────────────────────────────────
 async function fbGet(node) {
+    if (LOCAL_DATA_MODE) {
+        const file = LOCAL_DATA_FILES[node];
+        if (!file) return null;
+        const resp = await fetch(file + '?t=' + Date.now());
+        if (!resp.ok) throw new Error(`로컬 데이터 읽기 실패: ${file} (${resp.status})`);
+        return resp.json();
+    }
     const resp = await fetch(dbUrl(node));
     if (!resp.ok) throw new Error(`DB 읽기 실패: ${resp.status}`);
     return resp.json();
 }
 
-async function fbPut(node, data) {
+async function fbWrite(node, method, data) {
+    if (LOCAL_DATA_MODE) {
+        console.info(`[local-data] ${method} ${node}`, data);
+        return;
+    }
     const token = await getIdToken();
     const resp = await fetch(dbUrl(node, token), {
-        method: 'PUT',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: data === undefined ? undefined : JSON.stringify(data),
     });
     if (!resp.ok) {
         // 401/403이면 보통 익명 인증 미설정 또는 쓰기 규칙 문제
@@ -232,9 +268,11 @@ async function fbPut(node, data) {
     }
 }
 
+const fbPut = (node, data) => fbWrite(node, 'PUT', data);
+const fbPatch = (node, data) => fbWrite(node, 'PATCH', data);
+const fbDelete = (node) => fbWrite(node, 'DELETE');
+
 // ── 익명 인증 (쓰기 요청 토큰 확보) ────────────────────────────────────────
-// 읽기는 토큰 없이 가능하지만, 쓰기 규칙이 auth != null 이라 익명 로그인으로 토큰을 얻는다.
-// 팀원 개별 로그인은 필요 없으며, 화면상 편집 권한은 "공유 암호"가 따로 제어한다.
 async function initAnonymousAuth() {
     try {
         if (typeof firebase === 'undefined') return;
@@ -244,7 +282,6 @@ async function initAnonymousAuth() {
             await window._fbAuth.signInAnonymously();
         }
     } catch (e) {
-        // 익명 로그인이 콘솔에서 아직 비활성이면 여기로 옴 → 읽기는 가능, 저장 시 안내 표시
         console.warn('익명 인증 실패 — Firebase 콘솔에서 "익명" 로그인을 켜주세요:', e && (e.code || e.message));
     }
 }
@@ -261,7 +298,6 @@ async function initBackend() {
     // 익명 인증 먼저 (쓰기에 필요) — 실패해도 읽기는 진행
     await initAnonymousAuth();
 
-    // 데이터 + 편집 암호 로드 (읽기는 인증 불필요)
     try {
         await loadAllData();
         await loadEditPasscode();
@@ -278,7 +314,7 @@ async function initBackend() {
         AppState.isEditor = true;
         updateEditModeUI('unlocked');
     } else {
-        if (savedKey) localStorage.removeItem(EDIT_KEY_STORAGE); // 암호 변경/미설정 → 정리
+        if (savedKey) localStorage.removeItem(EDIT_KEY_STORAGE);
         AppState.isEditor = false;
         updateEditModeUI('locked');
     }
@@ -287,18 +323,15 @@ async function initBackend() {
 
 // ── 편집 버튼 표시 제어 ────────────────────────────────────────────────────
 function updateEditButtonsVisibility() {
-    // body에 역할 클래스를 부여 → CSS에서 읽기 전용 모드 스타일 적용
     document.body.classList.toggle('is-editor', AppState.isEditor);
     document.body.classList.toggle('is-viewer', !AppState.isEditor);
 
-    const editorOnly = document.querySelectorAll('.editor-only');
-    editorOnly.forEach(el => {
+    document.querySelectorAll('.editor-only').forEach(el => {
         if (AppState.isEditor) {
             el.removeAttribute('disabled');
             el.removeAttribute('aria-disabled');
             el.title = '';
         } else {
-            // 버튼류는 disabled, 그 외에는 aria-disabled로 표시 (CSS가 처리)
             if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
                 el.setAttribute('disabled', '');
             }
@@ -307,7 +340,6 @@ function updateEditButtonsVisibility() {
         }
     });
 
-    // tab1 읽기 전용 안내 배너
     const notice = document.getElementById('role-notice');
     if (notice) {
         if (AppState.isEditor) {
@@ -325,6 +357,7 @@ function updateEditButtonsVisibility() {
 async function loadAllData() {
     await loadRoster();
     await loadMatches();
+    await loadVenues();
     AppState.isSignedIn = true;
     renderTab1();
     showToast('데이터 로드 완료!');
@@ -333,26 +366,137 @@ async function loadAllData() {
 // ── 명단 ──────────────────────────────────────────────────────────────────
 async function loadRoster() {
     const data = await fbGet(DB_NODES.roster);
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
-        AppState.roster = data;
+    if (data && typeof data === 'object' && !Array.isArray(data) && Object.keys(data).length) {
+        AppState.roster = {};
+        for (const [name, v] of Object.entries(data)) {
+            AppState.roster[name] = normalizePlayer(name, v);
+        }
     } else {
         AppState.roster = getDefaultRoster();
         await fbPut(DB_NODES.roster, AppState.roster);
     }
 }
 
-async function saveRoster() {
-    await fbPut(DB_NODES.roster, AppState.roster);
+// 레거시(v1: "Member"/"Guest" 문자열) → v2 객체
+function normalizePlayer(name, v) {
+    if (typeof v === 'string') {
+        return { name, fullName: null, role: v === 'Guest' ? 'guest' : 'member', positions: [], jerseyNo: null, aliases: [], active: true };
+    }
+    return {
+        name,
+        fullName: v.fullName || null,
+        role: v.role === 'guest' ? 'guest' : 'member',
+        positions: Array.isArray(v.positions) ? v.positions : [],
+        jerseyNo: (v.jerseyNo === 0 || v.jerseyNo) ? v.jerseyNo : null,
+        aliases: Array.isArray(v.aliases) ? v.aliases : [],
+        active: v.active !== false,
+    };
+}
+
+async function savePlayer(name) {
+    const p = AppState.roster[name];
+    if (!p) return;
+    await fbPut(`/roster/${encodeURIComponent(dbKey(name))}.json`, p);
+}
+
+async function deletePlayerRecord(name) {
+    await fbDelete(`/roster/${encodeURIComponent(dbKey(name))}.json`);
 }
 
 // ── 경기 기록 ─────────────────────────────────────────────────────────────
 async function loadMatches() {
     const data = await fbGet(DB_NODES.matches);
-    AppState.matches = Array.isArray(data) ? data : [];
+    let list = [];
+    if (Array.isArray(data)) {
+        // v1: 배열 전체 저장 방식 → v2 레코드로 변환 (업로드 전까지의 호환)
+        const seen = {};
+        list = data.filter(Boolean).map(m => migrateLegacyMatch(m, seen));
+        AppState.legacyMatches = true;
+    } else if (data && typeof data === 'object') {
+        list = Object.values(data).filter(Boolean);
+        AppState.legacyMatches = false;
+    }
+    AppState.matches = list.sort((a, b) => String(a.id).localeCompare(String(b.id)));
 }
 
-async function saveMatches() {
-    await fbPut(DB_NODES.matches, AppState.matches);
+async function saveMatchRecord(record) {
+    await fbPut(`/matches/${encodeURIComponent(dbKey(record.id))}.json`, record);
+    const idx = AppState.matches.findIndex(m => m.id === record.id);
+    if (idx >= 0) AppState.matches[idx] = record; else AppState.matches.push(record);
+    AppState.matches.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
+async function deleteMatchRecord(id) {
+    await fbDelete(`/matches/${encodeURIComponent(dbKey(id))}.json`);
+    AppState.matches = AppState.matches.filter(m => m.id !== id);
+}
+
+// v1 레코드(날짜_장소_상대 ID, formation_plan 등) → v2 레코드
+function migrateLegacyMatch(old, seen = {}) {
+    let id = old.date || old.id;
+    if (seen[id]) id = `${old.date}-${String.fromCharCode(97 + seen[old.date])}`;
+    seen[old.date] = (seen[old.date] || 0) + 1;
+
+    const quarters = {};
+    QUARTERS.forEach(q => {
+        const lineup = (old.formation_plan && old.formation_plan[q]) || {};
+        const subsMap = (old.formation_subs && old.formation_subs[q]) || {};
+        const subs = Object.entries(subsMap)
+            .filter(([, n]) => n && n !== '-')
+            .map(([pos, n]) => ({ in: n, out: lineup[pos] || null, pos }));
+        quarters[q] = {
+            formation: (old.formation_types && old.formation_types[q]) || '4-2-3-1',
+            lineup: Object.fromEntries(Object.entries(lineup).filter(([, n]) => n && n !== '-')),
+            coords: (old.formation_coords && old.formation_coords[q]) || {},
+            subs,
+        };
+    });
+    const stats = {};
+    (old.match_stats || []).forEach(r => {
+        if (r && r['이름'] && ((r['골'] || 0) || (r['어시스트'] || 0))) {
+            stats[r['이름']] = { goals: r['골'] || 0, assists: r['어시스트'] || 0 };
+        }
+    });
+    return {
+        id,
+        date: old.date,
+        venue: old.location || '',
+        opponent: old.opponent || '상대팀',
+        title: `${old.location || ''} vs ${old.opponent || '상대팀'}`,
+        timeSlot: null,
+        notes: '',
+        type: 'match',
+        status: old.is_draft ? 'draft' : 'final',
+        quarterCount: 4,
+        onFieldSize: 11,
+        attendees: old.attendees || [],
+        quarters,
+        scores: old.scores || {},
+        scoresKnown: true,
+        stats,
+        events: old.match_events || [],
+        source: { kind: 'app-v1', legacyId: old.id },
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+// ── 경기장 목록 ───────────────────────────────────────────────────────────
+async function loadVenues() {
+    try {
+        const v = await fbGet(DB_NODES.venues);
+        AppState.venues = Array.isArray(v) && v.length ? v : [...DEFAULT_VENUES];
+    } catch {
+        AppState.venues = [...DEFAULT_VENUES];
+    }
+    // 구버전 localStorage 커스텀 경기장 병합
+    try {
+        const local = JSON.parse(localStorage.getItem('fc_barza_venues') || '[]');
+        local.forEach(v => { if (v && !AppState.venues.includes(v)) AppState.venues.push(v); });
+    } catch { /* ignore */ }
+}
+
+async function saveVenues() {
+    await fbPut(DB_NODES.venues, AppState.venues);
 }
 
 // ── 기본 선수 명단 ────────────────────────────────────────────────────────
@@ -364,6 +508,6 @@ function getDefaultRoster() {
         '민규', '지호', '지용', '세용', '영현', '정준', '성호', '경원',
     ];
     const roster = {};
-    defaults.forEach(p => roster[p] = 'Member');
+    defaults.forEach(p => roster[p] = normalizePlayer(p, 'Member'));
     return roster;
 }

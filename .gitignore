@@ -9,3 +9,6 @@ fc_barja_roster.json
 __pycache__/
 *.pyc
 app.py
+
+# 시트 이관 결과 (tools/import_sheet.py 출력)
+data/import/
