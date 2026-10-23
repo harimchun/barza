@@ -1351,11 +1351,13 @@ function buildMatchRecord(id, isDraft) {
         for (const [pos, n] of Object.entries(AppState.formationState[q] || {})) {
             if (n && n !== '-') lineup[pos] = n;
         }
+        const lockedPositions = Object.keys(AppState.locks[q] || {}).filter(p => AppState.locks[q][p] && lineup[p]);
         quarters[q] = {
             formation: AppState.formationTypes[q] || '4-2-3-1',
             lineup,
             coords: JSON.parse(JSON.stringify(AppState.formationCoords[q] || {})),
             subs: editorSubsForQuarter(q),
+            locks: lockedPositions,
         };
     });
     // 편집기가 다루지 않는 5Q 이상 쿼터는 그대로 보존
@@ -1504,6 +1506,8 @@ function loadMatchToEditor(record) {
         AppState.formationCoords[q] = JSON.parse(JSON.stringify(qd.coords || {}));
         AppState.formationSubs[q] = {};
         AppState.extraSubs[q] = [];
+        AppState.locks[q] = {};
+        (Array.isArray(qd.locks) ? qd.locks : []).forEach(pos => { if (AppState.formationState[q][pos]) AppState.locks[q][pos] = true; });
         (qd.subs || []).forEach(s => {
             let pos = s.pos && AppState.formationState[q][s.pos] === s.out ? s.pos : null;
             if (!pos && s.out) pos = Object.keys(AppState.formationState[q]).find(p => AppState.formationState[q][p] === s.out) || null;
