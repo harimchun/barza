@@ -112,7 +112,8 @@ function renderMatchDetail(match) {
       const mark = c >= 1 ? '●' : c > 0 ? '◐' : '';
       return `<td class="${c > 0 ? 'check-yes' : 'check-no'}">${mark}</td>`;
     }).join('');
-    return `<tr><td>${escapeHtml(formatPlayerName(n))}</td>${qCells}<td class="num-cell">${fmtQ(credits[n])}</td></tr>`;
+    const st = targets.status[n] || 'ok';
+    return `<tr class="squad-row-${st}"><td>${escapeHtml(formatPlayerName(n))}</td>${qCells}<td class="num-cell participation-score ${st}">${fmtQ(credits[n])}</td></tr>`;
   }).join('');
   const subsRows = quarters.map(q => {
     const subs = (((match.quarters || {})[q] || {}).subs || []);
@@ -120,8 +121,7 @@ function renderMatchDetail(match) {
     return `<li><strong>${q}</strong> ${subs.map(s => `${escapeHtml(s.in || '?')} <span class="sub-arrow">→</span> ${escapeHtml(s.out || '?')}${s.pos ? ` <small>(${escapeHtml(s.pos)})</small>` : ''}`).join(' · ')}</li>`;
   }).join('');
   const playedCount = played.length;
-  const target = playedCount ? (11 * quarters.length) / (match.attendees || []).length : 0;
-  const avg = playedCount ? played.reduce((s, n) => s + credits[n], 0) / playedCount : 0;
+  const targets = recordTargets(match);
 
   // 포메이션 이미지
   const plan = {}, subsMap = {}, types = {}, coords = {};
@@ -190,10 +190,11 @@ function renderMatchDetail(match) {
 
       <div id="dt-squad" class="detail-tab-panel" style="display:none">
         <div class="playtime-info" style="margin-bottom:0.5rem">
-          <span>참석 <strong>${(match.attendees || []).length}명</strong></span>
+          <span>참석 <strong>${targets.attendees}명</strong></span>
           <span>출전 <strong>${playedCount}명</strong></span>
-          <span>목표 <strong>${target.toFixed(2)}Q</strong></span>
-          <span>실제 평균 <strong>${avg.toFixed(2)}Q</strong></span>
+          <span>목표 <strong>${fmtQ(targets.target)}Q</strong> <small>(${targets.onFieldSize}명 × ${targets.quarterCount}Q)</small></span>
+          <span>실제 평균 <strong>${fmtQ(targets.avg)}Q</strong></span>
+          <span>범위 <strong>${fmtQ(targets.min)}~${fmtQ(targets.max)}Q</strong></span>
         </div>
         <table class="squad-table">
           <thead><tr><th>이름</th>${quarters.map(q => `<th>${q}</th>`).join('')}<th>참여</th></tr></thead>

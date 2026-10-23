@@ -122,19 +122,20 @@ function mergedBuilderCoords(fType, overrides) {
 }
 
 /**
- * 현재 AppState의 4개 쿼터 포메이션을 2x2 그리드로 합성 → PNG 다운로드
+ * 현재 AppState의 쿼터별 포메이션을 2열 그리드로 합성 → PNG 다운로드 (4·5쿼터)
  */
 function exportCombinedFormation() {
+    const qs = editorQuarters();
     const qW = 700, qH = 480;
     const canvas = document.createElement('canvas');
     canvas.width = qW * 2;
-    canvas.height = qH * 2;
+    canvas.height = qH * Math.ceil(qs.length / 2);
     const ctx = canvas.getContext('2d');
 
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    QUARTERS.forEach((q, i) => {
+    qs.forEach((q, i) => {
         const col = i % 2;
         const row = Math.floor(i / 2);
         const ox = col * qW;

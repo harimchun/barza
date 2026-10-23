@@ -71,7 +71,10 @@ Phase 0에서 정리한 구조. 쓰기는 항상 레코드 단위(`/matches/{id}
 목표 쿼터 = onFieldSize × quarterCount / 참석자 수     (4Q 11명이면 44/N, 5Q면 55/N)
 ```
 
-구현: `quarterCredit()`, `recordParticipation()` (js/app.js), 시트 쪽은 `participation()` (tools/import_sheet.py).
+구현: `js/quota.js` (`Quota.quarterCredit`, `computeParticipation`, `computeTargets`) — 브라우저/Node 공용, 테스트는 `tests/quota.test.js`.
+시트 쪽 동일 규칙: `participation()` (tools/import_sheet.py).
+
+`quarterCount`(4|5)와 `onFieldSize`는 경기 정보에서 선택하며, 편집기는 그 수만큼 쿼터 보드·개요·기록 버튼을 만든다.
 
 ## v1 → v2 변환
 

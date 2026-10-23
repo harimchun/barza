@@ -79,7 +79,25 @@
             <label for="match-opponent">🆚 상대팀</label>
             <input type="text" id="match-opponent" value="상대팀" placeholder="예: 청팀">
           </div>
+          <div class="form-group form-group-narrow">
+            <label for="match-quarter-count">⏱️ 쿼터 수</label>
+            <select id="match-quarter-count">
+              <option value="4">4쿼터</option>
+              <option value="5">5쿼터</option>
+            </select>
+          </div>
+          <div class="form-group form-group-narrow">
+            <label for="match-on-field">👕 쿼터당 출전</label>
+            <select id="match-on-field">
+              <option value="11">11명</option>
+              <option value="10">10명</option>
+              <option value="9">9명</option>
+              <option value="8">8명</option>
+              <option value="7">7명</option>
+            </select>
+          </div>
         </div>
+        <p class="hint-text" style="margin:0.4rem 0 0">목표 쿼터 = 쿼터당 출전 인원 × 쿼터 수 ÷ 참석자 수 (예: 11명 × 4쿼터, 14명 참석 → 3.14쿼터)</p>
       </div>
 
       <!-- 참석자 & 포메이션 2컬럼 -->
@@ -99,7 +117,7 @@
           </div>
 
           <div class="card">
-            <div class="card-title">쿼터별 출전 현황 <small class="hint-text">(포메이션 배치에서 자동 계산)</small></div>
+            <div class="card-title">쿼터별 출전 현황 <small class="hint-text">(포메이션 배치에서 자동 계산 · 교체 0.5)</small></div>
             <div id="squad-table-container">
               <p class="empty-hint">참석자를 선택하세요.</p>
             </div>
@@ -114,12 +132,7 @@
 
             <div class="formation-header">
               <div class="formation-header-left">
-                <div id="quarter-selector">
-                  <button class="qbtn active" data-q="1Q">1Q</button>
-                  <button class="qbtn" data-q="2Q">2Q</button>
-                  <button class="qbtn" data-q="3Q">3Q</button>
-                  <button class="qbtn" data-q="4Q">4Q</button>
-                </div>
+                <div id="quarter-selector"><!-- 쿼터 버튼 (JS에서 렌더링) --></div>
               </div>
               <div class="formation-type-row">
                 <label for="formation-type-select">포메이션</label>
@@ -143,7 +156,7 @@
 
             <div class="export-formation-row">
               <button id="export-formation-btn" class="btn-secondary" style="margin-top:0.75rem">
-                📸 1~4쿼터 전체 포메이션 다운로드
+                📸 전체 쿼터 포메이션 다운로드
               </button>
             </div>
           </div>
@@ -151,24 +164,7 @@
           <!-- 전체 쿼터 미리보기 -->
           <div class="formation-overview-panel" style="margin-top:0.75rem">
             <h4>📋 전체 쿼터 포메이션 개요</h4>
-            <div class="overview-grid">
-              <div class="overview-quarter">
-                <div class="overview-q-label">1Q</div>
-                <canvas id="overview-canvas-1Q" class="overview-canvas" width="280" height="190"></canvas>
-              </div>
-              <div class="overview-quarter">
-                <div class="overview-q-label">2Q</div>
-                <canvas id="overview-canvas-2Q" class="overview-canvas" width="280" height="190"></canvas>
-              </div>
-              <div class="overview-quarter">
-                <div class="overview-q-label">3Q</div>
-                <canvas id="overview-canvas-3Q" class="overview-canvas" width="280" height="190"></canvas>
-              </div>
-              <div class="overview-quarter">
-                <div class="overview-q-label">4Q</div>
-                <canvas id="overview-canvas-4Q" class="overview-canvas" width="280" height="190"></canvas>
-              </div>
-            </div>
+            <div class="overview-grid" id="overview-grid"><!-- 쿼터별 캔버스 (JS에서 렌더링) --></div>
           </div>
         </div>
       </div>
@@ -245,6 +241,7 @@
 
   <!-- ========== SCRIPTS ========== -->
   <script src="js/config.js"></script>
+  <script src="js/quota.js"></script>
   <script src="js/app.js"></script>
   <script src="js/drive.js"></script>
   <script src="js/formation.js"></script>

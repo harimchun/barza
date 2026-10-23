@@ -67,6 +67,15 @@ python3 tools/import_sheet.py ~/Downloads/바르자.xlsx --out data/import --upl
 
 > `scipy`, `numpy` 필요 (`pip install scipy numpy`). `report.md` 에 대시보드 대조 결과·별칭 해석·포메이션 추정 내역이 정리됩니다.
 
+## 쿼터 보장 계산 (js/quota.js)
+
+스프레드시트 수식을 그대로 옮긴 순수 함수 모듈입니다. 경기 정보에서 **쿼터 수(4/5)** 와 **쿼터당 출전 인원**을 고르면
+목표 쿼터 = 출전 인원 × 쿼터 수 ÷ 참석자 수 로 계산되고, 교체 In/Out 은 0.5쿼터로 차감됩니다.
+
+```bash
+node --test tests/*.test.js   # 시트의 실제 경기(2026.10.17)로 X열 값과 대조하는 테스트
+```
+
 ## 앱 실행
 
 ```bash

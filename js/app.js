@@ -79,6 +79,8 @@ const AppState = {
     matchDate: today(),
     matchLocation: '잠실유수지',
     matchOpponent: '상대팀',
+    quarterCount: 4,   // 4 | 5
+    onFieldSize: 11,   // 쿼터당 출전 인원 (목표 쿼터 계산용)
     attendees: [],   // string[]
     formationTypes: { '1Q': '4-2-3-1', '2Q': '4-2-3-1', '3Q': '4-2-3-1', '4Q': '4-2-3-1' },
     formationState: { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} }, // { q: { pos: name } }
@@ -153,17 +155,45 @@ function getRosterGroups() {
     return { members, inactive, guests, lastSeen };
 }
 
-// ── 쿼터 참여 계산 (시트 규칙) ─────────────────────────────────────────────
-// 한 쿼터에 보드에 있으면 1, 교체 In/Out에 등장할 때마다 0.5 차감 (최소 0)
-function quarterCredit(lineup, subs, name) {
-    const onBoard = Object.values(lineup || {}).includes(name);
-    let subCount = 0;
-    (subs || []).forEach(s => {
-        if (s.in === name) subCount++;
-        if (s.out === name) subCount++;
+// ── 쿼터 참여 계산 (시트 규칙) — 실제 계산은 js/quota.js (Quota) ──────────
+const quarterCredit = Quota.quarterCredit;
+
+// 편집 중인 경기의 쿼터 키 목록 (쿼터 수 설정에 따라 4 또는 5)
+function editorQuarters() {
+    return Quota.quarterKeys(AppState.quarterCount);
+}
+
+// 편집 상태 객체에 모든 쿼터 키가 있도록 보장 (쿼터 수 변경·초기화 시)
+function ensureQuarterState() {
+    editorQuarters().forEach(q => {
+        if (!AppState.formationTypes[q]) AppState.formationTypes[q] = '4-2-3-1';
+        if (!AppState.formationState[q]) AppState.formationState[q] = {};
+        if (!AppState.formationSubs[q]) AppState.formationSubs[q] = {};
+        if (!AppState.formationCoords[q]) AppState.formationCoords[q] = {};
+        if (!AppState.extraSubs[q]) AppState.extraSubs[q] = [];
+        if (!AppState.quarterScores[q]) AppState.quarterScores[q] = [0, 0];
     });
-    if (!onBoard && subCount === 0) return 0;
-    return Math.max(0, 1 - 0.5 * subCount);
+    if (!editorQuarters().includes(AppState.currentQuarter)) AppState.currentQuarter = '1Q';
+    if (!editorQuarters().includes(AppState.liveQuarter)) AppState.liveQuarter = '1Q';
+}
+
+// 편집 중인 경기를 Quota 입력 형식으로 변환
+function editorQuartersData() {
+    const quarters = {};
+    editorQuarters().forEach(q => {
+        quarters[q] = { lineup: AppState.formationState[q] || {}, subs: editorSubsForQuarter(q) };
+    });
+    return quarters;
+}
+
+// 편집 중인 경기의 목표/균형 지표
+function editorTargets() {
+    return Quota.computeTargets({
+        quarters: editorQuartersData(),
+        attendees: AppState.attendees,
+        quarterCount: AppState.quarterCount,
+        onFieldSize: AppState.onFieldSize,
+    });
 }
 
 // 편집 중인 경기 상태에서 쿼터별 교체 쌍 목록 생성
@@ -180,7 +210,7 @@ function editorSubsForQuarter(q) {
 
 function getParticipation(playerName) {
     let total = 0;
-    QUARTERS.forEach(q => {
+    editorQuarters().forEach(q => {
         total += quarterCredit(AppState.formationState[q], editorSubsForQuarter(q), playerName);
     });
     return total;
@@ -193,33 +223,39 @@ function recordQuarters(record) {
     return all.sort((a, b) => parseInt(a) - parseInt(b));
 }
 
-// 저장된 레코드에서 선수별 실 참여 쿼터
+// 저장된 레코드에서 선수별 실 참여 쿼터 { name: credit }
 function recordParticipation(record) {
+    const p = Quota.computeParticipation((record && record.quarters) || {}, recordQuarters(record));
     const credits = {};
-    recordQuarters(record).forEach(q => {
-        const qd = (record.quarters && record.quarters[q]) || {};
-        const names = new Set(Object.values(qd.lineup || {}));
-        (qd.subs || []).forEach(s => { if (s.in) names.add(s.in); if (s.out) names.add(s.out); });
-        names.forEach(n => { credits[n] = (credits[n] || 0) + quarterCredit(qd.lineup, qd.subs, n); });
-    });
+    Object.entries(p).forEach(([n, r]) => { credits[n] = r.credit; });
     return credits;
 }
 
-function fmtQ(n) {
-    return Number.isInteger(n) ? String(n) : n.toFixed(1);
+// 저장된 레코드의 목표/균형 지표
+function recordTargets(record) {
+    return Quota.computeTargets({
+        quarters: (record && record.quarters) || {},
+        attendees: (record && record.attendees) || [],
+        quarterCount: (record && record.quarterCount) || recordQuarters(record).length,
+        onFieldSize: (record && record.onFieldSize) || Quota.DEFAULT_ON_FIELD,
+    });
 }
+
+const fmtQ = Quota.fmt;
 
 function resetMatchState() {
     AppState.matchDate = today();
     AppState.matchLocation = AppState.venues[0] || '잠실유수지';
     AppState.matchOpponent = '상대팀';
+    AppState.quarterCount = Quota.DEFAULT_QUARTER_COUNT;
+    AppState.onFieldSize = Quota.DEFAULT_ON_FIELD;
     AppState.attendees = [];
-    AppState.formationTypes = { '1Q': '4-2-3-1', '2Q': '4-2-3-1', '3Q': '4-2-3-1', '4Q': '4-2-3-1' };
-    AppState.formationState = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
-    AppState.formationSubs = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
-    AppState.formationCoords = { '1Q': {}, '2Q': {}, '3Q': {}, '4Q': {} };
-    AppState.extraSubs = { '1Q': [], '2Q': [], '3Q': [], '4Q': [] };
-    AppState.quarterScores = { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
+    AppState.formationTypes = {};
+    AppState.formationState = {};
+    AppState.formationSubs = {};
+    AppState.formationCoords = {};
+    AppState.extraSubs = {};
+    AppState.quarterScores = {};
     AppState.matchStats = {};
     AppState.matchEvents = [];
     AppState.editingExtras = null;
@@ -230,6 +266,7 @@ function resetMatchState() {
     AppState.dupConfirmId = null;
     AppState.dupConfirmAction = null;
     AppState.lastAutoSave = null;
+    ensureQuarterState();
     stopAutoSave();
 }
 

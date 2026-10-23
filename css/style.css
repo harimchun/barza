@@ -2437,3 +2437,15 @@ details.check-group[open] > summary.check-group-title::before { content: '▾'; 
 .roster-edit-form input[type="text"], .roster-edit-form input[type="number"] { padding: 0.35rem 0.5rem; font-size: 0.85rem; }
 .roster-edit-actions { grid-column: 1 / -1; display: flex; gap: 0.5rem; }
 .roster-add-form #new-player-positions { flex: 1; min-width: 140px; }
+
+/* ── Phase 1: 쿼터 설정 · 실참여/목표 표시 ── */
+.form-group-narrow { flex: 0 0 auto; min-width: 110px; }
+.squad-table th small { display: block; font-size: 0.62rem; font-weight: 400; color: var(--text-muted); }
+.participation-score.unplayed, .participation-diff.unplayed { color: var(--text-muted); }
+.participation-diff { font-size: 0.78rem; text-align: center; white-space: nowrap; }
+.participation-diff.under { color: var(--blue); }
+.participation-diff.over { color: var(--red); }
+.participation-diff small { font-size: 0.65rem; opacity: 0.85; }
+.squad-row-under .squad-name { color: var(--blue); }
+.squad-row-over .squad-name { color: var(--red); }
+.squad-row-unplayed td { opacity: 0.6; }

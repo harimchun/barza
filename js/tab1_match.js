@@ -4,6 +4,9 @@
 
 // ── Tab 1 전체 렌더링 ──────────────────────────────────────────────────────
 function renderTab1() {
+    ensureQuarterState();
+    syncMatchSettingsUI();
+    renderQuarterSelector();
     renderPlayerChecklist();
     renderSquadTable();
     renderPlaytimeStats();
@@ -12,6 +15,33 @@ function renderTab1() {
     updateEditModeNotice();
     renderFormationOverview();
     updateAutoSaveStatus();
+}
+
+// 쿼터 선택 버튼 (쿼터 수에 따라 4~5개)
+function renderQuarterSelector() {
+    const el = document.getElementById('quarter-selector');
+    if (!el) return;
+    el.innerHTML = editorQuarters().map(q =>
+        `<button type="button" class="qbtn ${q === AppState.currentQuarter ? 'active' : ''}" data-q="${q}">${q}</button>`
+    ).join('');
+    const sel = document.getElementById('formation-type-select');
+    if (sel) sel.value = AppState.formationTypes[AppState.currentQuarter] || '4-2-3-1';
+}
+
+// 경기 설정 셀렉트(쿼터 수·출전 인원)를 상태와 맞춤
+function syncMatchSettingsUI() {
+    const qc = document.getElementById('match-quarter-count');
+    const of = document.getElementById('match-on-field');
+    if (qc) qc.value = String(AppState.quarterCount);
+    if (of) of.value = String(AppState.onFieldSize);
+}
+
+// 쿼터 수 / 출전 인원 변경
+function applyMatchSettings(quarterCount, onFieldSize) {
+    if (quarterCount) AppState.quarterCount = Quota.QUARTER_OPTIONS.includes(quarterCount) ? quarterCount : Quota.DEFAULT_QUARTER_COUNT;
+    if (onFieldSize) AppState.onFieldSize = onFieldSize;
+    ensureQuarterState();
+    renderTab1();
 }
 
 function updateEditModeNotice() {
@@ -29,7 +59,19 @@ function updateEditModeNotice() {
 
 // ── 전체 쿼터 포메이션 개요 ──────────────────────────────────────────────
 function renderFormationOverview() {
-    QUARTERS.forEach(q => {
+    const grid = document.getElementById('overview-grid');
+    if (grid) {
+        const want = editorQuarters().map(q => `overview-canvas-${q}`).join(',');
+        if (grid.dataset.canvases !== want) {
+            grid.innerHTML = editorQuarters().map(q => `
+              <div class="overview-quarter">
+                <div class="overview-q-label">${q}</div>
+                <canvas id="overview-canvas-${q}" class="overview-canvas" width="280" height="190"></canvas>
+              </div>`).join('');
+            grid.dataset.canvases = want;
+        }
+    }
+    editorQuarters().forEach(q => {
         const canvas = document.getElementById(`overview-canvas-${q}`);
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -151,39 +193,43 @@ function renderSquadTable() {
         container.innerHTML = '<p class="empty-hint">참석자를 선택해주세요.</p>';
         return;
     }
-    const target = targetQuarters();
-    const rows = AppState.attendees.map(name => {
-        const qCells = QUARTERS.map(q => {
-            const c = quarterCredit(AppState.formationState[q], editorSubsForQuarter(q), name);
-            const mark = c >= 1 ? '●' : c > 0 ? '◐' : '';
-            return `<td class="${c > 0 ? 'check-yes' : 'check-no'}" title="${c}">${mark}</td>`;
-        }).join('');
-        const part = getParticipation(name);
-        const diff = part - target;
-        const cls = diff <= -1 ? 'under' : diff >= 1 ? 'over' : '';
-        return `<tr>
+    const t = editorTargets();
+    const qs = t.quarterKeys;
+    const statusLabel = { under: '부족', over: '초과', ok: '' };
+    const rows = [...AppState.attendees]
+        .sort((a, b) => (t.participation[b] ? t.participation[b].credit : 0) - (t.participation[a] ? t.participation[a].credit : 0) || a.localeCompare(b, 'ko'))
+        .map(name => {
+            const p = t.participation[name] || { credit: 0, byQuarter: {} };
+            const qCells = qs.map(q => {
+                const c = p.byQuarter[q] || 0;
+                const mark = c >= 1 ? '●' : c > 0 ? '◐' : '';
+                return `<td class="${c > 0 ? 'check-yes' : 'check-no'}" title="${c}">${mark}</td>`;
+            }).join('');
+            const diff = p.credit - t.target;
+            const st = p.credit === 0 ? 'unplayed' : t.status[name];
+            const diffStr = p.credit === 0 ? '미출전' : `${diff > 0 ? '+' : ''}${fmtQ(diff, 1)}`;
+            return `<tr class="squad-row-${st}">
       <td class="squad-name">${escapeHtml(formatPlayerName(name))}</td>
       ${qCells}
-      <td class="participation-score ${cls}">${fmtQ(part)}</td>
+      <td class="participation-score ${st}">${fmtQ(p.credit)}</td>
+      <td class="participation-diff ${st}">${diffStr}${statusLabel[st] ? ` <small>${statusLabel[st]}</small>` : ''}</td>
     </tr>`;
-    }).join('');
+        }).join('');
 
+    const perQ = qs.map(q => `<th title="${q} 출전 인원">${q}<small>${t.perQuarter[q]}</small></th>`).join('');
     container.innerHTML = `
     <table class="squad-table">
       <thead>
-        <tr>
-          <th>이름</th><th>1Q</th><th>2Q</th><th>3Q</th><th>4Q</th><th>참여</th>
-        </tr>
+        <tr><th>이름</th>${perQ}<th>참여</th><th>목표 ${fmtQ(t.target)}</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <p class="hint-text" style="margin-top:0.4rem">● 주전 1쿼터 · ◐ 교체 In/Out 0.5쿼터 (포메이션 배치에서 자동 계산)</p>`;
+    <p class="hint-text" style="margin-top:0.4rem">● 주전 1쿼터 · ◐ 교체 In/Out 0.5쿼터 · 목표 = 출전 ${t.onFieldSize}명 × ${t.quarterCount}쿼터 ÷ 참석 ${t.attendees}명 · 목표와 1쿼터 이상 차이 나면 부족/초과</p>`;
 }
 
-// 목표 쿼터: (출전 인원 × 쿼터 수) / 참석자 수 — 시트의 "예상 평균쿼터"
+// 목표 쿼터 (시트의 "예상 평균쿼터")
 function targetQuarters() {
-    const n = AppState.attendees.length;
-    return n ? (11 * QUARTERS.length) / n : 0;
+    return editorTargets().target;
 }
 
 // ── 출전 시간 통계 ──────────────────────────────────────────────────────────
@@ -193,24 +239,23 @@ function renderPlaytimeStats() {
         if (el) el.innerHTML = '';
         return;
     }
-    const scores = AppState.attendees.map(n => getParticipation(n));
-    const played = scores.filter(s => s > 0);
-    const avg = played.length ? played.reduce((a, b) => a + b, 0) / played.length : 0;
-    const min = Math.min(...scores);
-    const max = Math.max(...scores);
-    const target = targetQuarters();
-    const imbalance = (max - min) >= 2;
-
+    const t = editorTargets();
+    const issues = [];
+    if (t.under.length) issues.push(`부족 ${t.under.map(escapeHtml).join(', ')}`);
+    if (t.over.length) issues.push(`초과 ${t.over.map(escapeHtml).join(', ')}`);
+    if (t.unplayed.length) issues.push(`미출전 ${t.unplayed.map(escapeHtml).join(', ')}`);
+    const slotNote = t.actualSlots !== t.slots ? ` · 배치 ${t.actualSlots}/${t.slots}` : '';
     el.innerHTML = `
     <div class="playtime-info">
-      <span>참석: <strong>${AppState.attendees.length}명</strong></span>
-      <span>목표: 인당 <strong>${target.toFixed(1)}Q</strong></span>
-      <span>실제 평균: <strong>${avg.toFixed(1)}Q</strong></span>
+      <span>참석 <strong>${t.attendees}명</strong></span>
+      <span>목표 <strong>${fmtQ(t.target)}Q</strong></span>
+      <span>실제 평균 <strong>${fmtQ(t.avg)}Q</strong></span>
+      <span>범위 <strong>${fmtQ(t.min)}~${fmtQ(t.max)}Q</strong>${slotNote}</span>
     </div>
-    <div class="playtime-alert ${imbalance ? 'warning' : 'success'}">
-      ${imbalance
-            ? `⚠️ 출전 시간 불균형! 최대 ${fmtQ(max)}Q vs 최소 ${fmtQ(min)}Q`
-            : `✅ 균형 배정 (${fmtQ(min)}Q ~ ${fmtQ(max)}Q)`}
+    <div class="playtime-alert ${t.balanced && !issues.length ? 'success' : 'warning'}">
+      ${t.balanced && !issues.length
+            ? `✅ 균형 배정 (최대-최소 ${fmtQ(t.spread)}Q)`
+            : `⚠️ ${t.balanced ? '' : `최대 ${fmtQ(t.max)}Q vs 최소 ${fmtQ(t.min)}Q`}${issues.length ? (t.balanced ? '' : ' · ') + issues.join(' · ') : ''}`}
     </div>`;
 }
 
@@ -497,7 +542,8 @@ function renderFormationBuilder() {
 
 // ── 이벤트 → 스코어/스탯 자동 계산 ─────────────────────────────────────────
 function recalcFromEvents() {
-    AppState.quarterScores = { '1Q': [0, 0], '2Q': [0, 0], '3Q': [0, 0], '4Q': [0, 0] };
+    AppState.quarterScores = {};
+    editorQuarters().forEach(q => { AppState.quarterScores[q] = [0, 0]; });
     AppState.matchStats = {};
 
     AppState.matchEvents.forEach(ev => {
@@ -532,8 +578,8 @@ function renderLiveRecorder() {
     const lq = AppState.liveQuarter;
     const hasEvents = AppState.matchEvents.length > 0;
 
-    const totalUs = QUARTERS.reduce((a, q) => a + AppState.quarterScores[q][0], 0);
-    const totalThem = QUARTERS.reduce((a, q) => a + AppState.quarterScores[q][1], 0);
+    const totalUs = editorQuarters().reduce((a, q) => a + AppState.quarterScores[q][0], 0);
+    const totalThem = editorQuarters().reduce((a, q) => a + AppState.quarterScores[q][1], 0);
 
     const playerOpts = AppState.attendees.map(n =>
         `<option value="${escapeHtml(n)}">${escapeHtml(formatPlayerName(n))}</option>`
@@ -548,7 +594,7 @@ function renderLiveRecorder() {
         ).join('');
     };
     const quarterOptions = (selected) =>
-        QUARTERS.map(qq => `<option value="${qq}" ${qq === selected ? 'selected' : ''}>${qq}</option>`).join('');
+        editorQuarters().map(qq => `<option value="${qq}" ${qq === selected ? 'selected' : ''}>${qq}</option>`).join('');
 
     const buildEditForm = (ev, globalIdx) => {
         const fields = ev.type === 'goal'
@@ -566,7 +612,7 @@ function renderLiveRecorder() {
             </div>`;
     };
 
-    const eventsHtml = QUARTERS.map(q => {
+    const eventsHtml = editorQuarters().map(q => {
         const qEvents = AppState.matchEvents.filter(e => e.quarter === q);
         const [us, them] = AppState.quarterScores[q];
         const evList = qEvents.length === 0
@@ -599,7 +645,7 @@ function renderLiveRecorder() {
     <details class="manual-score" ${AppState.editModeId ? 'open' : ''}>
       <summary>✍️ 스코어·골·어시스트 직접 입력 (이벤트 로그 없이 합계만 기록)</summary>
       <div class="manual-score-grid">
-        ${QUARTERS.map(q => `
+        ${editorQuarters().map(q => `
           <label>${q}
             <input type="number" min="0" class="manual-us" data-q="${q}" value="${AppState.quarterScores[q][0]}" aria-label="${q} 득점">
             :
@@ -626,7 +672,7 @@ function renderLiveRecorder() {
 
     <div class="live-input-section">
       <div class="live-quarter-selector">
-        ${QUARTERS.map(q => `<button class="live-qbtn ${q === lq ? 'active' : ''}" data-q="${q}">${q}</button>`).join('')}
+        ${editorQuarters().map(q => `<button class="live-qbtn ${q === lq ? 'active' : ''}" data-q="${q}">${q}</button>`).join('')}
       </div>
       <div class="live-action-row">
         <select id="live-scorer" class="live-select">
@@ -714,12 +760,12 @@ function renderLiveRecorder() {
     // 수동 입력 (이벤트 로그 없는 경우)
     const summaryEl = container.querySelector('.live-score-summary .live-total-score');
     const syncSummary = () => {
-        const u = QUARTERS.reduce((a, q) => a + AppState.quarterScores[q][0], 0);
-        const t = QUARTERS.reduce((a, q) => a + AppState.quarterScores[q][1], 0);
+        const u = editorQuarters().reduce((a, q) => a + AppState.quarterScores[q][0], 0);
+        const t = editorQuarters().reduce((a, q) => a + AppState.quarterScores[q][1], 0);
         if (summaryEl) summaryEl.textContent = `${u} : ${t}`;
         container.querySelectorAll('.event-quarter-block').forEach((blk, i) => {
             const s = blk.querySelector('.event-q-score');
-            if (s) s.textContent = `${AppState.quarterScores[QUARTERS[i]][0]} : ${AppState.quarterScores[QUARTERS[i]][1]}`;
+            if (s) s.textContent = `${AppState.quarterScores[editorQuarters()[i]][0]} : ${AppState.quarterScores[editorQuarters()[i]][1]}`;
         });
     };
     container.querySelectorAll('.manual-us, .manual-them').forEach(inp => {
@@ -845,13 +891,18 @@ function initTab1Events() {
         if (e.key === 'Enter') document.getElementById('add-guest-btn').click();
     });
 
+    // 쿼터 수 / 출전 인원
+    const qcSel = document.getElementById('match-quarter-count');
+    if (qcSel) qcSel.addEventListener('change', e => applyMatchSettings(parseInt(e.target.value, 10), null));
+    const ofSel = document.getElementById('match-on-field');
+    if (ofSel) ofSel.addEventListener('change', e => applyMatchSettings(null, parseInt(e.target.value, 10)));
+
     // 쿼터 선택
     document.getElementById('quarter-selector').addEventListener('click', e => {
         const btn = e.target.closest('.qbtn');
         if (!btn) return;
         AppState.currentQuarter = btn.dataset.q;
-        document.querySelectorAll('.qbtn').forEach(b => b.classList.toggle('active', b.dataset.q === AppState.currentQuarter));
-        document.getElementById('formation-type-select').value = AppState.formationTypes[AppState.currentQuarter];
+        renderQuarterSelector();
         renderFormationBuilder();
     });
 
@@ -899,7 +950,7 @@ function initTab1Events() {
 function buildMatchRecord(id, isDraft) {
     const extras = AppState.editingExtras || {};
     const quarters = {};
-    QUARTERS.forEach(q => {
+    editorQuarters().forEach(q => {
         const lineup = {};
         for (const [pos, n] of Object.entries(AppState.formationState[q] || {})) {
             if (n && n !== '-') lineup[pos] = n;
@@ -934,7 +985,7 @@ function buildMatchRecord(id, isDraft) {
         type: extras.type || 'match',
         status: isDraft ? 'draft' : 'final',
         quarterCount: Object.keys(quarters).length,
-        onFieldSize: extras.onFieldSize || 11,
+        onFieldSize: AppState.onFieldSize || Quota.DEFAULT_ON_FIELD,
         attendees: [...AppState.attendees],
         quarters,
         scores,
@@ -1030,16 +1081,22 @@ function loadMatchToEditor(record) {
     AppState.matchDate = record.date;
     AppState.matchLocation = record.venue;
     AppState.matchOpponent = record.opponent;
+    const recQuarters = recordQuarters(record).length;
+    AppState.quarterCount = Quota.QUARTER_OPTIONS.includes(recQuarters) ? recQuarters : Quota.DEFAULT_QUARTER_COUNT;
+    AppState.onFieldSize = record.onFieldSize || Quota.DEFAULT_ON_FIELD;
+    ensureQuarterState();
     AppState.attendees = [...allNames].filter(Boolean);
     AppState.editModeId = record.id;
     AppState.editingExtras = {
         type: record.type, timeSlot: record.timeSlot, notes: record.notes, source: record.source,
         onFieldSize: record.onFieldSize,
-        quarters: Object.fromEntries(Object.entries(record.quarters || {}).filter(([q]) => !QUARTERS.includes(q))),
-        scores: Object.fromEntries(Object.entries(record.scores || {}).filter(([q]) => !QUARTERS.includes(q))),
+        quarters: Object.fromEntries(Object.entries(record.quarters || {}).filter(([q]) => !editorQuarters().includes(q))),
+        scores: Object.fromEntries(Object.entries(record.scores || {}).filter(([q]) => !editorQuarters().includes(q))),
     };
+    AppState.formationTypes = {}; AppState.formationState = {}; AppState.formationCoords = {};
+    AppState.formationSubs = {}; AppState.extraSubs = {}; AppState.quarterScores = {};
 
-    QUARTERS.forEach(q => {
+    editorQuarters().forEach(q => {
         const qd = (record.quarters || {})[q] || {};
         AppState.formationTypes[q] = FORMATION_POSITIONS[qd.formation] ? qd.formation : '4-2-3-1';
         AppState.formationState[q] = { ...(qd.lineup || {}) };
@@ -1067,9 +1124,6 @@ function loadMatchToEditor(record) {
     populateVenueSelect(record.venue);
     document.getElementById('venue-custom-row').style.display = 'none';
     document.getElementById('match-opponent').value = record.opponent;
-    document.getElementById('formation-type-select').value = AppState.formationTypes[AppState.currentQuarter];
-    document.querySelectorAll('.qbtn').forEach(b => b.classList.toggle('active', b.dataset.q === AppState.currentQuarter));
-
     renderTab1();
     startAutoSave();
     setTimeout(() => {
